@@ -1,11 +1,15 @@
 #include <iostream>
 #include <string>
 
-#include "lib.hpp"
+#include "app.hpp"
 
 auto main() -> int
 {
-  auto lib = Library {};
-  lib.Run();
+  try {
+    auto app = App {};
+    app.Run();
+  } catch (std::invalid_argument& ex) {
+    std::cerr << "Error: " << ex.what() << std::endl;
+  }
   return 0;
 }

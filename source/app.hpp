@@ -2,9 +2,9 @@
 
 #include <string>
 
-struct Library
+struct App
 {
   std::string name;
-  Library();
+  App();
   void Run();
 };

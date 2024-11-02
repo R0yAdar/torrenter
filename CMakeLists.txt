@@ -6,7 +6,7 @@ project(
     torrenter
     VERSION 1.0.0
     DESCRIPTION "Short description"
-    HOMEPAGE_URL "https://example.com/"
+    HOMEPAGE_URL ""
     LANGUAGES CXX
 )
 
@@ -17,8 +17,8 @@ include(cmake/variables.cmake)
 
 add_library(
     torrenter_lib OBJECT
-    source/lib.cpp
- "source/bitTorrent/protocol.cpp" "source/bitTorrent/protocol.h")
+    "source/app.cpp" "source/bitTorrent/protocol.cpp" "source/bitTorrent/protocol.hpp" "source/bitTorrent/bencode.cpp"
+    "source/bitTorrent/protocol.cpp" "source/bitTorrent/protocol.hpp" "source/bitTorrent/bencode.cpp")
 
 target_include_directories(
     torrenter_lib ${warning_guard}
@@ -32,15 +32,14 @@ find_package(fmt REQUIRED)
 target_link_libraries(torrenter_lib PRIVATE fmt::fmt)
 
 find_package(OpenSSL REQUIRED)
-add_definitions(-DBOOST_ALL_NO_LIB) 
 target_link_libraries(torrenter_lib PRIVATE openssl::openssl)
 
-find_package(Boost REQUIRED COMPONENTS asio)
+find_package(Boost REQUIRED)
 target_link_libraries(torrenter_lib PRIVATE boost::boost)
 
 # ---- Declare executable ----
 
-add_executable(torrenter_exe source/main.cpp "source/bitTorrent/protocol.cpp" "source/bitTorrent/protocol.h")
+add_executable(torrenter_exe source/main.cpp)
 add_executable(torrenter::exe ALIAS torrenter_exe)
 
 set_property(TARGET torrenter_exe PROPERTY OUTPUT_NAME torrenter)
@@ -56,7 +55,7 @@ if(NOT CMAKE_SKIP_INSTALL_RULES)
 endif()
 
 # ---- Developer mode ----
-return() # Causes boost problem
+
 if(NOT torrenter_DEVELOPER_MODE)
   return()
 elseif(NOT PROJECT_IS_TOP_LEVEL)

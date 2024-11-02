@@ -9,14 +9,18 @@ project(torrenterTests LANGUAGES CXX)
 find_package(Catch2 REQUIRED)
 include(Catch)
 
+find_package(Boost REQUIRED COMPONENTS headers)
+
 # ---- Tests ----
 
-add_executable(torrenter_test source/torrenter_test.cpp)
-target_link_libraries(
-    torrenter_test PRIVATE
-    torrenter_lib
-    Catch2::Catch2WithMain
-)
+add_executable(torrenter_test source/bitTorrent/bencode_test.cpp)
+
+# Important to have that before any link to boost or a program that uses boost:
+target_link_libraries(torrenter_test PRIVATE Catch2::Catch2WithMain) 
+target_link_libraries(torrenter_test PRIVATE Boost::headers)
+
+target_link_libraries(torrenter_test PRIVATE torrenter_lib)
+
 target_compile_features(torrenter_test PRIVATE cxx_std_20)
 
 catch_discover_tests(torrenter_test)

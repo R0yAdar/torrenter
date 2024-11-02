@@ -13,4 +13,4 @@ class Recipe(ConanFile):
         self.requires("boost/1.86.0")
 
     def build_requirements(self):
-        self.test_requires("catch2/3.7.0")
+        self.test_requires("catch2/3.7.1")
