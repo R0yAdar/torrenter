@@ -178,8 +178,7 @@ DecodeResult BDecoder::decode(std::string_view value, int maxDepth) const
   }
 }
 
-BeValue BDecoder::operator()(std::string_view value, int maxDepth = 
-    BDecoder::DEFAULT_MAX_DEPTH) const
+BeValue BDecoder::operator()(std::string_view value, int maxDepth) const
 {
   return decode(value, maxDepth).result;
 }
