@@ -112,7 +112,7 @@ DecodeResult BDecoder::decodeString(std::string_view value) const
           delimitIndex + length};
 }
 
-DecodeResult BDecoder::decodeDict(std::string_view value) const
+DecodeResult BDecoder::decodeDict(std::string_view value, int maxDepth) const
 {
   Dict values {};
   size_t index = 1;
@@ -125,7 +125,7 @@ DecodeResult BDecoder::decodeDict(std::string_view value) const
     index += keyUsedChars;
 
     auto [val, valUsedChars] =
-        decode(value.substr(index, value.length() - index));
+        decode(value.substr(index, value.length() - index), maxDepth - 1);
 
     values[boost::get<std::string>(key)] = val;
 
@@ -135,7 +135,7 @@ DecodeResult BDecoder::decodeDict(std::string_view value) const
   return {values, ++index};
 }
 
-DecodeResult BDecoder::decodeList(std::string_view value) const
+DecodeResult BDecoder::decodeList(std::string_view value, int maxDepth) const
 {
   List values {};
   size_t index = 1;
@@ -144,7 +144,7 @@ DecodeResult BDecoder::decodeList(std::string_view value) const
       throw std::invalid_argument("Corrupted list encoding: no suffix");
     }
     auto [result, usedChars] =
-        decode(value.substr(index, value.length() - index));
+        decode(value.substr(index, value.length() - index), maxDepth - 1);
     values.push_back(result);
     index += usedChars;
   }
@@ -152,8 +152,12 @@ DecodeResult BDecoder::decodeList(std::string_view value) const
   return {values, ++index};
 }
 
-DecodeResult BDecoder::decode(std::string_view value) const
+DecodeResult BDecoder::decode(std::string_view value, int maxDepth) const
 {
+  if (maxDepth < 1) {
+    std::runtime_error("Reached maximum decoding depth");
+  }
+
   if (value.length() < MINIMUM_BEVALUE_ENCODED_SIZE) {
     throw std::invalid_argument("Input length must be greater than minium");
   }
@@ -162,9 +166,9 @@ DecodeResult BDecoder::decode(std::string_view value) const
     case INT_PREFIX:
       return decodeInt(value);
     case DICT_PREFIX:
-      return decodeDict(value);
+      return decodeDict(value, maxDepth);
     case LIST_PREFIX:
-      return decodeList(value);
+      return decodeList(value, maxDepth);
     default:
       if ('0' <= value.front() && value.front() <= '9') {
         return decodeString(value);
@@ -174,9 +178,10 @@ DecodeResult BDecoder::decode(std::string_view value) const
   }
 }
 
-BeValue BDecoder::operator()(std::string_view value) const
+BeValue BDecoder::operator()(std::string_view value, int maxDepth = 
+    BDecoder::DEFAULT_MAX_DEPTH) const
 {
-  return decode(value).result;
+  return decode(value, maxDepth).result;
 }
 
 }  // namespace bencode

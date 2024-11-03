@@ -37,14 +37,16 @@ struct DecodeResult
 class BDecoder
 {
 public:
-  BeValue operator()(std::string_view value) const;
+  static const int DEFAULT_MAX_DEPTH = 10;
+
+  BeValue operator()(std::string_view value, int maxDepth = BDecoder::DEFAULT_MAX_DEPTH) const;
 
 private:
   DecodeResult decodeInt(std::string_view value) const;
   DecodeResult decodeString(std::string_view value) const;
-  DecodeResult decodeDict(std::string_view value) const;
-  DecodeResult decodeList(std::string_view value) const;
-  DecodeResult decode(std::string_view value) const;
+  DecodeResult decodeDict(std::string_view value, int maxDepth) const;
+  DecodeResult decodeList(std::string_view value, int maxDepth) const;
+  DecodeResult decode(std::string_view value, int maxDepth) const;
 };
 
 }  // namespace bencode
