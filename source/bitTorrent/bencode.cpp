@@ -108,7 +108,12 @@ DecodeResult BDecoder::decodeString(std::string_view value) const
     throw std::invalid_argument("Corrupted string encoding: string length");
   }
 
-  return {std::string(value.data() + (++delimitIndex), length),
+  if (length + (++delimitIndex) > value.length()) {
+    throw std::invalid_argument(
+        "Corrupted string encoding: length doesn't match string");
+  }
+
+  return {std::string(value.data() + delimitIndex, length),
           delimitIndex + length};
 }
 
