@@ -3,17 +3,19 @@
 #include <format>
 #include <sstream>
 #include <system_error>
+#include <iostream>
 
 #include "bencode.hpp"
 
 namespace bencode
 {
-const char INT_PREFIX = 'i';
-const char LIST_PREFIX = 'l';
-const char DICT_PREFIX = 'd';
-const char SUFFIX = 'e';
-const char STRING_LENGTH_DELIMETER = ':';
-const int MINIMUM_BEVALUE_ENCODED_SIZE = 2;
+
+constexpr char INT_PREFIX = 'i';
+constexpr char LIST_PREFIX = 'l';
+constexpr char DICT_PREFIX = 'd';
+constexpr char SUFFIX = 'e';
+constexpr char STRING_LENGTH_DELIMETER = ':';
+constexpr int MINIMUM_BEVALUE_ENCODED_SIZE = 2;
 
 std::string BEncoder::operator()(BeValue value) const
 {
@@ -58,7 +60,7 @@ std::string BEncoder::operator()(const Dict& values) const
   return stream.str();
 }
 
-DecodeResult BDecoder::decodeInt(std::string_view value) const
+DecodeResult BDecoder::decode_int(std::string_view value) const
 {
   auto endIndex = value.find_first_of(SUFFIX);
   if (endIndex == std::string::npos) {
@@ -84,7 +86,7 @@ DecodeResult BDecoder::decodeInt(std::string_view value) const
   return {intValue, ++endIndex};
 }
 
-DecodeResult BDecoder::decodeString(std::string_view value) const
+DecodeResult BDecoder::decode_string(std::string_view value) const
 {
   auto delimitIndex = value.find_first_of(STRING_LENGTH_DELIMETER);
 
@@ -117,7 +119,7 @@ DecodeResult BDecoder::decodeString(std::string_view value) const
           delimitIndex + length};
 }
 
-DecodeResult BDecoder::decodeDict(std::string_view value, int maxDepth) const
+DecodeResult BDecoder::decode_dict(std::string_view value, int maxDepth) const
 {
   Dict values {};
   size_t index = 1;
@@ -126,7 +128,7 @@ DecodeResult BDecoder::decodeDict(std::string_view value, int maxDepth) const
       throw std::invalid_argument("Corrupted list encoding: no suffix");
     }
     auto [key, keyUsedChars] =
-        decodeString(value.substr(index, value.length() - index));
+        decode_string(value.substr(index, value.length() - index));
     index += keyUsedChars;
 
     auto [val, valUsedChars] =
@@ -140,7 +142,7 @@ DecodeResult BDecoder::decodeDict(std::string_view value, int maxDepth) const
   return {values, ++index};
 }
 
-DecodeResult BDecoder::decodeList(std::string_view value, int maxDepth) const
+DecodeResult BDecoder::decode_list(std::string_view value, int maxDepth) const
 {
   List values {};
   size_t index = 1;
@@ -160,7 +162,7 @@ DecodeResult BDecoder::decodeList(std::string_view value, int maxDepth) const
 DecodeResult BDecoder::decode(std::string_view value, int maxDepth) const
 {
   if (maxDepth < 1) {
-    std::runtime_error("Reached maximum decoding depth");
+    throw std::runtime_error("Reached maximum decoding depth");
   }
 
   if (value.length() < MINIMUM_BEVALUE_ENCODED_SIZE) {
@@ -169,15 +171,16 @@ DecodeResult BDecoder::decode(std::string_view value, int maxDepth) const
 
   switch (value.front()) {
     case INT_PREFIX:
-      return decodeInt(value);
+      return decode_int(value);
     case DICT_PREFIX:
-      return decodeDict(value, maxDepth);
+      return decode_dict(value, maxDepth);
     case LIST_PREFIX:
-      return decodeList(value, maxDepth);
+      return decode_list(value, maxDepth);
     default:
       if ('0' <= value.front() && value.front() <= '9') {
-        return decodeString(value);
+        return decode_string(value);
       }
+
       throw std::invalid_argument(
           std::format("Invalid token at front: {}", value[0]));
   }

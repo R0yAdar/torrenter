@@ -17,8 +17,20 @@ include(cmake/variables.cmake)
 
 add_library(
     torrenter_lib OBJECT
-    "source/app.cpp" "source/bitTorrent/protocol.cpp" "source/bitTorrent/protocol.hpp" "source/bitTorrent/bencode.cpp"
-    "source/bitTorrent/protocol.cpp" "source/bitTorrent/protocol.hpp" "source/bitTorrent/bencode.cpp")
+    "source/app.cpp" 
+    "source/bitTorrent/metadata/bencode.hpp" 
+    "source/bitTorrent/metadata/bencode.cpp"
+    "source/bitTorrent/metadata/torrentfile.hpp"
+    "source/bitTorrent/metadata/torrentfile.cpp"
+    "source/bitTorrent/messages.hpp" 
+    "source/client/tracker/tracker.hpp"
+    "source/client/tracker/tracker.cpp"
+    "source/auxiliary/peer_id.hpp"
+     
+    "source/utp/packet.cpp"
+    "source/utp/packet.h" 
+    "source/client/tracker/tracker.cpp" 
+    "source/client/torrenter.cpp")
 
 target_include_directories(
     torrenter_lib ${warning_guard}
@@ -26,7 +38,7 @@ target_include_directories(
     "\$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/source>"
 )
 
-target_compile_features(torrenter_lib PUBLIC cxx_std_20)
+target_compile_features(torrenter_lib PUBLIC cxx_std_23)
 
 find_package(fmt REQUIRED)
 target_link_libraries(torrenter_lib PRIVATE fmt::fmt)
@@ -35,7 +47,7 @@ find_package(OpenSSL REQUIRED)
 target_link_libraries(torrenter_lib PRIVATE openssl::openssl)
 
 find_package(Boost REQUIRED)
-target_link_libraries(torrenter_lib PRIVATE boost::boost)
+target_link_libraries(torrenter_lib PRIVATE Boost::headers)
 
 # ---- Declare executable ----
 
@@ -44,7 +56,7 @@ add_executable(torrenter::exe ALIAS torrenter_exe)
 
 set_property(TARGET torrenter_exe PROPERTY OUTPUT_NAME torrenter)
 
-target_compile_features(torrenter_exe PRIVATE cxx_std_20)
+target_compile_features(torrenter_exe PRIVATE cxx_std_23)
 
 target_link_libraries(torrenter_exe PRIVATE torrenter_lib)
 
