@@ -47,7 +47,6 @@ private:
   T m_beValue;
 };
 
-using byte = uint8_t;
 using int16_big = BigEndian<int16_t>;
 using int32_big = BigEndian<int32_t>;
 using int64_big = BigEndian<int64_t>;

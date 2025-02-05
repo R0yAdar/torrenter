@@ -18,16 +18,18 @@ include(cmake/variables.cmake)
 add_library(
     torrenter_lib OBJECT
     "source/app.cpp" 
-    "source/bitTorrent/metadata/bencode.hpp" 
-    "source/bitTorrent/metadata/bencode.cpp"
-    "source/bitTorrent/metadata/torrentfile.hpp"
-    "source/bitTorrent/metadata/torrentfile.cpp"
-    "source/bitTorrent/messages.hpp" 
+    "source/torrent/metadata/bencode.hpp" 
+    "source/torrent/metadata/bencode.cpp"
+    "source/torrent/metadata/torrentfile.hpp"
+    "source/torrent/metadata/torrentfile.cpp"
+    "source/torrent/messages.hpp" 
     "source/client/tracker/tracker.hpp"
     "source/client/tracker/tracker.cpp"
+    "source/client/peer.hpp"
+    "source/client/peer.cpp"
+    "source/client/context.hpp"
     "source/auxiliary/peer_id.hpp"
      
-    "source/utp/packet.cpp"
     "source/utp/packet.h" 
     "source/client/tracker/tracker.cpp" 
     "source/client/torrenter.cpp")

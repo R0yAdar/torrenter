@@ -10,6 +10,7 @@
 #include <string_view>
 
 #include "auxiliary/big_endian.hpp"
+#include "client/context.hpp"
 
 namespace btr
 {
@@ -38,8 +39,18 @@ struct PACKED_ATTRIBUTE FixedString
 
 struct PACKED_ATTRIBUTE Handshake
 {
+  Handshake(const PeerContext& context)
+  {
+    std::copy(context.client_id.get_id().cbegin(),
+              context.client_id.get_id().cend(),
+              peer_id);
+
+    std::copy(context.infohash.cbegin(), context.infohash.cend(), infohash);
+  }
+
   int8_t plen = 19;
   FixedString<19> pname {"BitTorrent protocol"};
+  uint8_t reserved[8];
   char infohash[20];
   char peer_id[20];
 };
@@ -59,7 +70,7 @@ private:
   uint8_t id = Id;
 };
 
-struct Have
+struct PACKED_ATTRIBUTE Have
 {
 private:
   MessageMetadata<5, 4> metadata;
@@ -68,7 +79,7 @@ public:
   uint32_big piece_index;
 };
 
-struct Request
+struct PACKED_ATTRIBUTE Request
 {
 private:
   MessageMetadata<13, 6> metadata;
@@ -79,7 +90,7 @@ public:
   uint32_big length;
 };
 
-struct Cancel
+struct PACKED_ATTRIBUTE Cancel
 {
 private:
   MessageMetadata<13, 8> metadata;
@@ -106,7 +117,7 @@ using NotInterested = MessageMetadata<1, 3>;
 
 // dynamic length messages
 
-struct PieceMetadata
+struct PACKED_ATTRIBUTE PieceMetadata
 {
 public:
   void addLength(int32_t addedLength) { metadata.addLength(addedLength); }
