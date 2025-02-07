@@ -1,13 +1,12 @@
 #pragma once
-#include <algorithm>
 #include <expected>
-#include <iostream>
-#include <vector>
+#include <memory>
 
 #include <boost/asio.hpp>
 
-#include "torrent/tracker_messages.hpp"
+#include "client/context.hpp"
 #include "client/torrenter.hpp"
+#include "torrent/tracker_messages.hpp"
 
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
@@ -17,6 +16,18 @@ using namespace boost::asio;
 
 namespace btr
 {
-std::expected<std::vector<udp::endpoint>, error_code> udp_fetch_swarm(
-    const Torrenter& torrenter, address address, port_type port);
+class Tracker
+{
+  address m_address;
+  port_type m_port;
+  std::shared_ptr<PeerContext> m_context;
+
+public:
+  Tracker(std::shared_ptr<PeerContext> context,
+          address address,
+          port_type port);
+
+  boost::asio::awaitable<void> fetch_udp_swarm(
+      io_context& io, std::vector<udp::endpoint>& endpoints);
+};
 }  // namespace btr

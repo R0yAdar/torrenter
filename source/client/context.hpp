@@ -12,5 +12,6 @@ class PeerContext
 public:
   PeerId client_id;
   InfoHash infohash;
+  uint64_t filesize;
 };
 }  // namespace btr

@@ -3,87 +3,183 @@
 #include <iostream>
 #include <vector>
 
+#include "client/tracker/tracker.hpp"
+
 #include <boost/asio.hpp>
+#include <boost/asio/experimental/awaitable_operators.hpp>
 
 #include "torrent/tracker_messages.hpp"
-#include "client/torrenter.hpp"
 
+using boost::asio::io_context;
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
 using boost::asio::ip::udp;
 using boost::system::error_code;
-using namespace boost::asio;
+using time_point = std::chrono::steady_clock::time_point;
+using namespace boost::asio::experimental::awaitable_operators;
+using namespace std::chrono_literals;
 
 namespace btr
 {
-std::expected<std::vector<udp::endpoint>, error_code> udp_fetch_swarm(
-    const Torrenter& torrenter, address address, port_type port)
+Tracker::Tracker(std::shared_ptr<PeerContext> context,
+                 address address,
+                 port_type port)
+    : m_context {std::move(context)}
+    , m_address {address}
+    , m_port {port}
 {
-  std::vector<udp::endpoint> result;
+}
 
-  boost::asio::io_service io_service;
+template<typename T>
+concept UdpTrackerMessage = requires(const T ptr) {
+  {
+    ptr.action
+  } -> std::convertible_to<uint32_big>;
+};
 
-  udp::socket socket(io_service);
+template<UdpTrackerMessage T>
+std::expected<T*, ErrorResponse> parse_message(uint8_t* message_ptr,
+                                               size_t message_size)
+{
+  T* message = reinterpret_cast<T*>(message_ptr);
 
-  udp::endpoint remote_endpoint = udp::endpoint(address, port);
+  if (message_size < sizeof(T)
+      || message->action == static_cast<uint32_t>(Actions::Error))
+  {
+    auto error_message = reinterpret_cast<ErrorResponse*>(message_ptr);
 
-  socket.open(remote_endpoint.protocol());
+    if (message_size < sizeof(ErrorResponse)
+        || error_message->action != static_cast<uint32_t>(Actions::Error))
+    {
+      return std::unexpected(ErrorResponse {});
+    }
 
-  error_code err;
+    ErrorResponse error {};
 
-  ConnectRequest request {};
-
-  auto bytesSent = socket.send_to(
-      boost::asio::buffer(&request, sizeof(request)), remote_endpoint, 0, err);
-
-  udp::endpoint sender {};
-  std::vector<uint8_t> buffer {};
-
-  buffer.resize(UINT16_MAX);
-  auto size = socket.receive_from(boost::asio::buffer(buffer), sender);
-
-  // sender should be remote_endpoint
-
-  if (size < sizeof(ConnectResponse)) {
-    // return error
+    error.action = error_message->action;
+    error.transaction_id = error_message->transaction_id;
+    (*((&error_message->action) + message_size - 1)) = 0;  // null terminator
+    error.message = std::string(
+        ((reinterpret_cast<char*>(&(error_message->transaction_id) + 1))));
   }
 
-  ConnectResponse* response = (ConnectResponse*)buffer.data();
+  return {message};
+}
 
-  auto connection_id = response->connection_id;
+std::vector<udp::endpoint> parse_ipv4_peer_endpoints(AnnounceResponse* response,
+                                                     size_t max_size)
+{
+  std::vector<udp::endpoint> endpoints {};
 
-  AnnounceRequest annReq {torrenter, connection_id};
+  IpV4Port* ips = reinterpret_cast<IpV4Port*>(
+      reinterpret_cast<int8_t*>(&response->action) + sizeof(AnnounceResponse));
 
-  socket.send_to(
-      boost::asio::buffer(&annReq, sizeof(annReq)), remote_endpoint, 0, err);
+  auto peers_count =
+      std::min(static_cast<uint16_t>((max_size - sizeof(AnnounceResponse))
+                                     / sizeof(IpV4Port)),
+               static_cast<uint16_t>(response->leechers + response->seeders));
+
+  for (size_t i = 0; i < peers_count && ips[i].ip != 0; i++) {
+    endpoints.emplace_back(ip::make_address_v4(ips[i].ip),
+                           static_cast<uint16_t>(ips[i].port));
+  }
+
+  return endpoints;
+}
+
+boost::asio::awaitable<void> timeout(time_point& deadline)
+{
+  steady_timer timer(co_await this_coro::executor);
+  auto now = std::chrono::steady_clock::now();
+
+  while (deadline > now) {
+    timer.expires_at(deadline);
+    co_await timer.async_wait(use_awaitable);
+    now = std::chrono::steady_clock::now();
+  }
+}
+
+boost::asio::awaitable<void> async_receive_from(udp::socket& socket,
+                                                std::vector<uint8_t>& buffer,
+                                                udp::endpoint& sender,
+                                                size_t& bytes_recieved)
+{
+#pragma warning(push)
+#pragma warning(disable : 26811)
+  bytes_recieved =
+      co_await socket.async_receive_from(boost::asio::buffer(buffer), sender);
+#pragma warning(pop)
+}
+
+boost::asio::awaitable<size_t> async_receive_from_with_timeout(
+    udp::socket& socket,
+    std::vector<uint8_t>& buffer,
+    udp::endpoint& sender,
+    time_point deadline)
+{
+  size_t bytes_recieved = 0;
+  co_await (async_receive_from(socket, buffer, sender, bytes_recieved)
+            || timeout(deadline));
+
+  co_return bytes_recieved;
+}
+
+// Add timeout
+boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
+    io_context& io, std::vector<udp::endpoint>& out_peer_endpoints)
+{
+  auto deadline =
+      std::chrono::steady_clock::now() + 1s;  // deadline of 1 second
+
+  udp::socket socket(io);
+
+  udp::endpoint remote_endpoint = udp::endpoint(m_address, m_port);
+
+  socket.open(remote_endpoint.protocol());
+  std::vector<uint8_t> buffer {};
+  buffer.resize(UINT16_MAX);
+
+  {
+    ConnectRequest request {};
+
+    co_await socket.async_send_to(
+        boost::asio::buffer(&request, sizeof(request)), remote_endpoint);
+  }
+
+  udp::endpoint sender {};
+
+  auto handshake_response =
+      parse_message<ConnectResponse>(buffer.data(),
+                                     co_await async_receive_from_with_timeout(
+                                         socket, buffer, sender, deadline));
+
+  if (!handshake_response || sender != remote_endpoint) {
+    co_return;
+  }
+
+  auto connection_id = (*handshake_response)->connection_id;
 
   std::fill(buffer.begin(), buffer.end(), 0);
 
-  size = socket.receive_from(boost::asio::buffer(buffer), sender);
+  AnnounceRequest peers_request {*m_context, connection_id};
 
-  AnnounceResponse* anresponse = (AnnounceResponse*)buffer.data();
+  co_await socket.async_send_to(
+      boost::asio::buffer(&peers_request, sizeof(peers_request)),
+      remote_endpoint);
 
-  IpV4Port* ips =
-      reinterpret_cast<IpV4Port*>(buffer.data() + sizeof(AnnounceResponse));
+  auto response =
+      parse_message<AnnounceResponse>(buffer.data(),
+                                      co_await async_receive_from_with_timeout(
+                                          socket, buffer, sender, deadline));
 
-  std::cout << buffer.size() << std::endl;
+  if (!response || sender != remote_endpoint) {
+    co_return;
+  }
 
-  auto peers_count = std::min(
-      static_cast<uint16_t>((UINT16_MAX - sizeof(AnnounceResponse))
-                            / sizeof(IpV4Port)),
-      static_cast<uint16_t>(anresponse->leechers + anresponse->seeders));
-
-  for (size_t i = 0; i < peers_count; i++) {
-    if (ips->ip == 0) {
-      break;
-    }
-
-    result.emplace_back(ip::make_address_v4(ips->ip),
-                        static_cast<uint16_t>(ips->port));
-    ++ips;
+  for (auto ip : parse_ipv4_peer_endpoints(*response, buffer.size())) {
+    out_peer_endpoints.emplace_back(ip);
   }
 
   socket.close();
-  return result;
 }
 }  // namespace btr

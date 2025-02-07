@@ -18,14 +18,20 @@ Torrenter::Torrenter(TorrentFile torrent)
     , m_peer_id {}
 {
 }
+
+// Download file is async and not multi-threaded
+// Because multi-threading is obsolete for an io bound task like this
+// And Boost-Asio provides a wonderful interface for high-performance
+// async services. 
 void Torrenter::download_file(std::filesystem::path at)
 {
+  // resolve trackers
   std::regex rgx(R"(udp://([a-zA-Z0-9.-]+):([0-9]+)/announce)");
 
   std::vector<boost::asio::ip::udp::endpoint> endpoints {};
   std::smatch match;
 
-  io_context io_1 {};
+  io_context resolve_io {};
 
   for (auto tracker : m_torrent.trackers) {
     std::println("{}", tracker);
@@ -35,10 +41,11 @@ void Torrenter::download_file(std::filesystem::path at)
       int16_t port = static_cast<int16_t>(std::stoi(match[2]));
 
       boost::asio::co_spawn(
-          io_1,
-          [&io_1, &endpoints, address, port]() -> boost::asio::awaitable<void>
+          resolve_io,
+          [&resolve_io, &endpoints, address, port]()
+              -> boost::asio::awaitable<void>
           {
-            boost::asio::ip::udp::resolver resolver(io_1);
+            boost::asio::ip::udp::resolver resolver(resolve_io);
             boost::asio::ip::udp::resolver::query query(
                 boost::asio::ip::udp::v4(), address, std::to_string(port));
             boost::asio::ip::udp::endpoint endpoint =
@@ -50,34 +57,62 @@ void Torrenter::download_file(std::filesystem::path at)
     }
   }
 
-  io_1.run();
+  resolve_io.run();
+
+  std::println("Finished resolving");
+
+  // init context
+
+  std::vector<Peer> peers;
+
+  io_context connect_io {};
+
+  auto context = std::make_shared<PeerContext>();
+
+  context->client_id = m_peer_id;
+  context->infohash = m_torrent.info_hash;
+
+  // fetch peers
+
+  io_context swarm_io {};
+
+  std::vector<udp::endpoint> swarm;
+
+  std::vector<Tracker> trackers;
 
   for (auto& endpoint : endpoints) {
-    io_context io {};
-
-    auto swarm =
-        btr::udp_fetch_swarm(*this, endpoint.address(), endpoint.port());
-
-    auto context = std::make_shared<PeerContext>();
-
-    context->client_id = m_peer_id;
-    context->infohash = m_torrent.info_hash;
-
-    std::vector<Peer> peers;
-
-    if (swarm) {
-      for (const auto& endpoint : *swarm) {
-        Peer peer {context, endpoint.address(), endpoint.port()};
-        peers.push_back(peer);
-      }
-
-      for (auto& peer : peers) {
-        boost::asio::co_spawn(
-            io, peer.connect_async(io), boost::asio::detached);
-      }
-
-      io.run();
-    }
+    trackers.emplace_back(context, endpoint.address(), endpoint.port());
   }
+
+  for (auto& tracker : trackers) {
+    boost::asio::co_spawn(swarm_io,
+                          tracker.fetch_udp_swarm(swarm_io, swarm),
+                          boost::asio::detached);
+  }
+
+  std::println("Starting to fetch swarm");
+  swarm_io.run();
+  std::println("Finished fetching swarm");
+
+  // connect to peers
+
+  for (const auto& endpoint : swarm) {
+    peers.emplace_back(context, endpoint.address(), endpoint.port());
+  }
+
+  for (auto& peer : peers) {
+    boost::asio::co_spawn(
+        connect_io, peer.connect_async(connect_io), boost::asio::detached);
+  }
+
+  connect_io.run();
+
+  // bitfield and assignment
+
+  // task managing, downloading pieces (& validating)
+
+  // THE END (game)
+
+  // Final end
 }
 }  // namespace btr

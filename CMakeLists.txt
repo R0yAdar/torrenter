@@ -22,6 +22,8 @@ add_library(
     "source/torrent/metadata/bencode.cpp"
     "source/torrent/metadata/torrentfile.hpp"
     "source/torrent/metadata/torrentfile.cpp"
+    "source/torrent/bitfield/bitfield.hpp"
+    "source/torrent/bitfield/bitfield.cpp"
     "source/torrent/messages.hpp" 
     "source/client/tracker/tracker.hpp"
     "source/client/tracker/tracker.cpp"

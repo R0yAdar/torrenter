@@ -11,7 +11,7 @@
 
 #include "auxiliary/big_endian.hpp"
 #include "auxiliary/random.hpp"
-#include "client/torrenter.hpp"
+#include "client/context.hpp"
 
 namespace btr
 {
@@ -56,22 +56,20 @@ struct PACKED_ATTRIBUTE ConnectResponse
 
 struct PACKED_ATTRIBUTE AnnounceRequest
 {
-  AnnounceRequest(const Torrenter& torrenter, uint64_big p_connection_id)
+  AnnounceRequest(const PeerContext& context, uint64_big p_connection_id)
   {
     connection_id = p_connection_id;
     action = static_cast<uint32_t>(Actions::Announce);
     transaction_id = generate_random_in_range<uint32_t, 0, UINT32_MAX>();
 
-    std::copy(torrenter.m_peer_id.get_id().cbegin(),
-              torrenter.m_peer_id.get_id().cend(),
+    std::copy(context.client_id.get_id().cbegin(),
+              context.client_id.get_id().cend(),
               peer_id);
 
-    std::copy(torrenter.m_torrent.info_hash.cbegin(),
-              torrenter.m_torrent.info_hash.cend(),
-              info_hash);
+    std::copy(context.infohash.cbegin(), context.infohash.cend(), info_hash);
 
     downloaded = 0;
-    left = torrenter.m_torrent.file_length;
+    left = context.filesize;
     key = generate_random_in_range<uint32_t, 0, UINT32_MAX>();
     port = 2929;
   }
@@ -92,6 +90,12 @@ struct PACKED_ATTRIBUTE AnnounceRequest
   uint16_big port;  // your listening port
 };
 
+struct PACKED_ATTRIBUTE IpV4Port
+{
+  uint32_big ip;
+  uint16_big port;
+};
+
 struct PACKED_ATTRIBUTE AnnounceResponse
 {
   uint32_big action;
@@ -99,22 +103,15 @@ struct PACKED_ATTRIBUTE AnnounceResponse
   uint32_big interval;
   uint32_big leechers;
   uint32_big seeders;
-  // IpV4Port[N]... (N = leechers + seeders) 
-};
-
-struct PACKED_ATTRIBUTE IpV4Port
-{
-  uint32_big ip;
-  uint16_big port;
+  // IpV4Port[N]... (N = leechers + seeders)
 };
 
 struct PACKED_ATTRIBUTE ErrorResponse
 {
-  int32_big action;
+  uint32_big action = static_cast<uint32_t>(Actions::Error);
   uint32_big transaction_id;
-  char* message;
+  std::string message;
 };
 
 #pragma pack(pop)
-
 }  // namespace btr

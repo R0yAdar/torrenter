@@ -1,10 +1,11 @@
 #include <algorithm>
 #include <iostream>
 
+#include "client/peer.hpp"
+
 #include <boost/asio.hpp>
 
 #include "torrent/messages.hpp"
-#include "client/peer.hpp"
 
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
@@ -13,8 +14,8 @@ namespace btr
 {
 
 Peer::Peer(std::shared_ptr<const PeerContext> context,
-     address address,
-     port_type port)
+           address address,
+           port_type port)
     : m_address {address}
     , m_port {port}
     , m_context {context}
@@ -38,6 +39,21 @@ boost::asio::awaitable<void> Peer::connect_async(boost::asio::io_context& io)
         socket,
         boost::asio::buffer(&handshake, sizeof(handshake)),
         boost::asio::use_awaitable);
+
+    std::vector<uint8_t> data {};
+    data.resize(sizeof(Handshake));
+
+    try {
+      co_await boost::asio::async_read(socket,
+                                       boost::asio::buffer(data, data.size()),
+                                       boost::asio::use_awaitable);
+
+
+      std::cout << "Got handshake " << ((Handshake*)data.data())->peer_id
+                << std::endl;
+    } catch (const std::exception& e) {
+      std::cout << "Failed handshake with " << m_address << std::endl;
+    }
 
     socket.close();
   } catch (const std::exception& e) {
