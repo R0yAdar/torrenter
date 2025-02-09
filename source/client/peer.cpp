@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <array>
 #include <iostream>
+#include <string_view>
 
 #include "client/peer.hpp"
 
 #include <boost/asio.hpp>
 
+#include "client/transmit/boost_transmit.hpp"
 #include "torrent/messages.hpp"
 
 using boost::asio::ip::address;
@@ -13,51 +16,50 @@ using boost::asio::ip::port_type;
 namespace btr
 {
 
-Peer::Peer(std::shared_ptr<const PeerContext> context,
+Peer::Peer(std::shared_ptr<const InternalContext> context,
            address address,
            port_type port)
     : m_address {address}
     , m_port {port}
-    , m_context {context}
+    , m_application_context {context}
+    , m_context {}
 {
+}
+
+std::weak_ptr<const ExternalPeerContext> Peer::get_context()
+{
+  return {m_context};
 }
 
 boost::asio::awaitable<void> Peer::connect_async(boost::asio::io_context& io)
 {
-  boost::asio::ip::tcp::socket socket(io);
-
   try {
+    boost::asio::ip::tcp::socket socket(io);
+
     co_await socket.async_connect(
         boost::asio::ip::tcp::endpoint(m_address, m_port),
         boost::asio::use_awaitable);
+    {
+      btr::Handshake handshake {*m_application_context};
 
-    std::cout << "Connected to " << m_address << std::endl;
+      co_await send_handshake(socket, handshake);
+    }
 
-    btr::Handshake handshake {*m_context};
+    auto handshake = co_await read_handshake(socket);
 
-    co_await boost::asio::async_write(
-        socket,
-        boost::asio::buffer(&handshake, sizeof(handshake)),
-        boost::asio::use_awaitable);
+    std::string_view peer_id(handshake.peer_id, 10);
 
-    std::vector<uint8_t> data {};
-    data.resize(sizeof(Handshake));
+    std::cout << '<' << m_address << "> PeerId: <" << peer_id << '>'
+              << std::endl;
 
-    try {
-      co_await boost::asio::async_read(socket,
-                                       boost::asio::buffer(data, data.size()),
-                                       boost::asio::use_awaitable);
+    auto message = (co_await read_message(socket));
 
-
-      std::cout << "Got handshake " << ((Handshake*)data.data())->peer_id
-                << std::endl;
-    } catch (const std::exception& e) {
-      std::cout << "Failed handshake with " << m_address << std::endl;
+    if (message) {
+      std::cout << "Read message, type: " << message->index() << std::endl;
     }
 
     socket.close();
   } catch (const std::exception& e) {
-    std::cout << "Failed to connect to " << m_address << std::endl;
   }
 }
 }  // namespace btr

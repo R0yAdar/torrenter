@@ -56,7 +56,7 @@ struct PACKED_ATTRIBUTE ConnectResponse
 
 struct PACKED_ATTRIBUTE AnnounceRequest
 {
-  AnnounceRequest(const PeerContext& context, uint64_big p_connection_id)
+  AnnounceRequest(const InternalContext& context, uint64_big p_connection_id)
   {
     connection_id = p_connection_id;
     action = static_cast<uint32_t>(Actions::Announce);

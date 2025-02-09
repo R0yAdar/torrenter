@@ -21,7 +21,7 @@ using namespace std::chrono_literals;
 
 namespace btr
 {
-Tracker::Tracker(std::shared_ptr<PeerContext> context,
+Tracker::Tracker(std::shared_ptr<InternalContext> context,
                  address address,
                  port_type port)
     : m_context {std::move(context)}
@@ -124,12 +124,11 @@ boost::asio::awaitable<size_t> async_receive_from_with_timeout(
   co_return bytes_recieved;
 }
 
-// Add timeout
 boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
-    io_context& io, std::vector<udp::endpoint>& out_peer_endpoints)
+    io_context& io, std::vector<udp::endpoint>& out_peer_endpoints, std::chrono::seconds timeout)
 {
   auto deadline =
-      std::chrono::steady_clock::now() + 1s;  // deadline of 1 second
+      std::chrono::steady_clock::now() + timeout;
 
   udp::socket socket(io);
 

@@ -11,23 +11,25 @@
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
 using boost::asio::ip::udp;
-using boost::system::error_code;
 using namespace boost::asio;
+using namespace std::chrono_literals;
 
 namespace btr
 {
 class Tracker
 {
+  std::shared_ptr<InternalContext> m_context;
   address m_address;
   port_type m_port;
-  std::shared_ptr<PeerContext> m_context;
 
 public:
-  Tracker(std::shared_ptr<PeerContext> context,
+  Tracker(std::shared_ptr<InternalContext> context,
           address address,
           port_type port);
 
   boost::asio::awaitable<void> fetch_udp_swarm(
-      io_context& io, std::vector<udp::endpoint>& endpoints);
+      io_context& io,
+      std::vector<udp::endpoint>& endpoints,
+      std::chrono::seconds timeout = 1s);
 };
 }  // namespace btr

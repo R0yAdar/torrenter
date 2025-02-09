@@ -25,6 +25,10 @@ add_library(
     "source/torrent/bitfield/bitfield.hpp"
     "source/torrent/bitfield/bitfield.cpp"
     "source/torrent/messages.hpp" 
+    "source/client/reactor/reactor.hpp"
+    "source/client/reactor/reactor.cpp"
+    "source/client/transmit/boost_transmit.hpp"
+    "source/client/transmit/boost_transmit.cpp"
     "source/client/tracker/tracker.hpp"
     "source/client/tracker/tracker.cpp"
     "source/client/peer.hpp"
@@ -33,7 +37,6 @@ add_library(
     "source/auxiliary/peer_id.hpp"
      
     "source/utp/packet.h" 
-    "source/client/tracker/tracker.cpp" 
     "source/client/torrenter.cpp")
 
 target_include_directories(

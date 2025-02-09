@@ -40,7 +40,7 @@ void App::Run()
              "\nStarted running...\n");
 
   std::string torrent_file_path =
-      "C:\\Users\\royad\\Downloads\\1929081.torrent";
+      "C:\\Users\\royad\\Downloads\\dexter.torrent";
 
   auto file = std::ifstream {torrent_file_path, std::ios::binary};
   std::stringstream file_contents {};

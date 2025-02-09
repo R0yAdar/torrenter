@@ -3,6 +3,7 @@
 #include <memory>
 #include <print>
 #include <regex>
+#include <set>
 
 #include "client/torrenter.hpp"
 
@@ -22,7 +23,7 @@ Torrenter::Torrenter(TorrentFile torrent)
 // Download file is async and not multi-threaded
 // Because multi-threading is obsolete for an io bound task like this
 // And Boost-Asio provides a wonderful interface for high-performance
-// async services. 
+// async services.
 void Torrenter::download_file(std::filesystem::path at)
 {
   // resolve trackers
@@ -32,7 +33,7 @@ void Torrenter::download_file(std::filesystem::path at)
   std::smatch match;
 
   io_context resolve_io {};
-
+  
   for (auto tracker : m_torrent.trackers) {
     std::println("{}", tracker);
 
@@ -67,7 +68,7 @@ void Torrenter::download_file(std::filesystem::path at)
 
   io_context connect_io {};
 
-  auto context = std::make_shared<PeerContext>();
+  auto context = std::make_shared<InternalContext>();
 
   context->client_id = m_peer_id;
   context->infohash = m_torrent.info_hash;
@@ -96,7 +97,13 @@ void Torrenter::download_file(std::filesystem::path at)
 
   // connect to peers
 
-  for (const auto& endpoint : swarm) {
+  std::set<boost::asio::ip::udp::endpoint> unique_endpoints;
+
+  for (auto& peer : swarm) {
+    unique_endpoints.insert(peer);
+  }
+
+  for (const auto& endpoint : unique_endpoints) {
     peers.emplace_back(context, endpoint.address(), endpoint.port());
   }
 
