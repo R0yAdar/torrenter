@@ -2,26 +2,38 @@
 
 #include "torrent/bitfield/bitfield.hpp"
 
+namespace aux
+{
+
+BitField::BitField()
+    : m_bitfield {}
+{
+}
+
 BitField::BitField(size_t piece_count)
     : m_bitfield(piece_count)
 {
 }
 
-BitField::BitField(std::vector<std::byte> bitfield)
-    : m_bitfield {}
+BitField::BitField(std::vector<uint8_t> bitfield)
+    : m_bitfield(bitfield.size())
 {
-  m_bitfield.reserve(bitfield.size());
   std::copy(bitfield.cbegin(), bitfield.cend(), m_bitfield.begin());
 }
 
-constexpr void BitField::mark(size_t piece_index, bool value)
+void BitField::mark(size_t piece_index, bool value)
 {
   size_t container_index =
-      piece_index / sizeof(decltype(m_bitfield)::value_type);
+      piece_index / (sizeof(decltype(m_bitfield)::value_type) * 8);
 
-  size_t value_index = piece_index % sizeof(decltype(m_bitfield)::value_type);
+  if (container_index >= m_bitfield.size()) {
+    m_bitfield.resize(container_index + 1);
+  }
 
-  std::byte mask = std::byte {1} >> value_index;
+  size_t value_index =
+      piece_index % (sizeof(decltype(m_bitfield)::value_type) * 8);
+
+  uint8_t mask = 1 << value_index;
 
   if (value) {
     m_bitfield[container_index] |= mask;
@@ -30,19 +42,36 @@ constexpr void BitField::mark(size_t piece_index, bool value)
   }
 }
 
-constexpr bool BitField::get(size_t piece_index)
+bool BitField::get(size_t piece_index) const
 {
   size_t container_index =
-      piece_index / sizeof(decltype(m_bitfield)::value_type);
+      piece_index / (sizeof(decltype(m_bitfield)::value_type) * 8);
 
-  size_t value_index = piece_index % sizeof(decltype(m_bitfield)::value_type);
+  if (container_index >= m_bitfield.size()) {
+    return false;
+  }
 
-  std::byte mask = static_cast<std::byte>(1 >> value_index);
+  size_t value_index =
+      piece_index % (sizeof(decltype(m_bitfield)::value_type) * 8);
 
-  return (mask & m_bitfield[container_index]) > std::byte {0};
+  uint8_t mask = 1 << value_index;
+
+  return (mask & m_bitfield[container_index]) > 0;
 }
 
-constexpr std::vector<std::byte> BitField::as_raw() 
+bool BitField::is_empty() const
+{
+  uint8_t indicator = 0;
+
+  for (auto u : m_bitfield) {
+    indicator |= u;
+  }
+
+  return indicator == 0;
+}
+
+std::vector<std::uint8_t> BitField::as_raw()
 {
   return m_bitfield;
 }
+}  // namespace aux

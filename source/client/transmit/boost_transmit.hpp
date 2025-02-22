@@ -6,20 +6,12 @@
 
 #include "torrent/messages.hpp"
 
+using boost::asio::awaitable;
+using boost::asio::ip::tcp;
+
 namespace btr
 {
-template<uint32_t AnyLength, uint8_t AnyId>
-boost::asio::awaitable<void> send_message(
-    boost::asio::ip::tcp::socket& socket,
-    MessageMetadata<AnyLength, AnyId> message);
-
-boost::asio::awaitable<void> send_message(boost::asio::ip::tcp::socket& socket,
-                                          Keepalive message);
-
-template<SupportsDynamicLength Metadata>
-boost::asio::awaitable<void> send_message(
-    boost::asio::ip::tcp::socket& socket,
-    DynamicLengthMessage<Metadata> message);
+awaitable<void> send_message(tcp::socket& socket, TorrentMessage& message);
 
 enum class ParseError
 {
@@ -27,12 +19,10 @@ enum class ParseError
   UnknownId,
 };
 
-boost::asio::awaitable<std::expected<TorrentMessage, ParseError>> read_message(
-    boost::asio::ip::tcp::socket& socket);
+awaitable<std::expected<TorrentMessage, ParseError>> read_message(
+    tcp::socket& socket);
 
-boost::asio::awaitable<Handshake> read_handshake(
-    boost::asio::ip::tcp::socket& socket);
+awaitable<Handshake> read_handshake(tcp::socket& socket);
 
-boost::asio::awaitable<void> send_handshake(
-    boost::asio::ip::tcp::socket& socket, Handshake handshake);
+awaitable<void> send_handshake(tcp::socket& socket, Handshake handshake);
 }  // namespace btr

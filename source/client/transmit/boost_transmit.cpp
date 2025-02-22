@@ -6,11 +6,19 @@
 
 namespace btr
 {
-
+namespace
+{
 template<uint32_t AnyLength, uint8_t AnyId>
-boost::asio::awaitable<void> send_message(
-    boost::asio::ip::tcp::socket& socket,
-    MessageMetadata<AnyLength, AnyId> message)
+awaitable<void> send_message(tcp::socket& socket,
+                             MessageMetadata<AnyLength, AnyId>& message)
+{
+  co_await boost::asio::async_write(
+      socket,
+      boost::asio::buffer(&message, sizeof(message)),
+      boost::asio::use_awaitable);
+}
+template<typename PackedStruct>
+awaitable<void> send_message(tcp::socket& socket, PackedStruct& message)
 {
   co_await boost::asio::async_write(
       socket,
@@ -18,30 +26,82 @@ boost::asio::awaitable<void> send_message(
       boost::asio::use_awaitable);
 }
 
-boost::asio::awaitable<void> send_message(boost::asio::ip::tcp::socket& socket,
-                                          Keepalive message)
+awaitable<void> send_message(tcp::socket& socket, Keepalive& message)
 {
   co_await boost::asio::async_write(
       socket,
       boost::asio::buffer(&message, sizeof(message)),
       boost::asio::use_awaitable);
 }
+
 template<SupportsDynamicLength Metadata>
-boost::asio::awaitable<void> send_message(
-    boost::asio::ip::tcp::socket& socket,
-    DynamicLengthMessage<Metadata> message)
+awaitable<void> send_message(tcp::socket& socket,
+                             DynamicLengthMessage<Metadata>& message)
 {
+  auto metadata = message.get_metadata();
+
   std::array<boost::asio::const_buffer, 2> buffers = {
-      boost::asio::buffer(&(message.metadata), sizeof(message.metadata)),
+      boost::asio::buffer(&metadata, sizeof(metadata)),
       boost::asio::buffer(message.get_payload())};
 
   co_await boost::asio::async_write(
       socket, buffers, boost::asio::use_awaitable);
 }
+}  // namespace
 
+awaitable<void> send_message(tcp::socket& socket, TorrentMessage& message)
+{
+  switch (message.index() - 1) {
+    case ID_KEEPALIVE:
+      co_await send_message(socket, std::get<Keepalive>(message));
+      break;
+
+    case ID_CHOKE:
+      co_await send_message(socket, std::get<Choke>(message));
+      break;
+
+    case ID_UNCHOKE:
+      co_await send_message(socket, std::get<Unchoke>(message));
+      break;
+
+    case ID_INTERESTED:
+      co_await send_message(socket, std::get<Interested>(message));
+      break;
+
+    case ID_NOT_INTERESTED:
+      co_await send_message(socket, std::get<NotInterested>(message));
+      break;
+
+    case ID_HAVE:
+      co_await send_message(socket, std::get<Have>(message));
+      break;
+
+    case ID_BITFIELD:
+      co_await send_message(socket, std::get<BitField>(message));
+      break;
+
+    case ID_REQUEST:
+      co_await send_message(socket, std::get<Request>(message));
+      break;
+
+    case ID_PIECE:
+      co_await send_message(socket, std::get<Piece>(message));
+      break;
+
+    case ID_PORT:
+      co_await send_message(socket, std::get<Port>(message));
+      break;
+
+    case ID_CANCEL:
+      co_await send_message(socket, std::get<Cancel>(message));
+      break;
+  }
+}
+
+namespace
+{
 template<typename T>
-std::expected<T*, ParseError> static reinterpret_safely(
-    std::vector<uint8_t>& buffer)
+std::expected<T*, ParseError> reinterpret_safely(std::vector<uint8_t>& buffer)
 {
   if (sizeof(T) > buffer.size()) {
     return std::unexpected(ParseError::LengthMismatch);
@@ -50,7 +110,7 @@ std::expected<T*, ParseError> static reinterpret_safely(
   return reinterpret_cast<T*>(buffer.data());
 }
 
-std::expected<TorrentMessage, ParseError> static parse_message(
+std::expected<TorrentMessage, ParseError> parse_message(
     uint8_t id, std::vector<uint8_t>& data)
 {
   switch (id) {
@@ -93,9 +153,10 @@ std::expected<TorrentMessage, ParseError> static parse_message(
       return std::unexpected(ParseError::UnknownId);
   }
 }
+}  // namespace
 
-boost::asio::awaitable<std::expected<TorrentMessage, ParseError>> read_message(
-    boost::asio::ip::tcp::socket& socket)
+awaitable<std::expected<TorrentMessage, ParseError>> read_message(
+    tcp::socket& socket)
 {
   uint32_big message_length;
 
@@ -108,22 +169,17 @@ boost::asio::awaitable<std::expected<TorrentMessage, ParseError>> read_message(
     co_return Keepalive {};
   }
 
-  uint8_t message_id;
-  co_await boost::asio::async_read(
-      socket,
-      boost::asio::buffer(&message_id, sizeof(message_id)),
-      boost::asio::use_awaitable);
+  std::vector<uint8_t> buffer(message_length + sizeof(message_length));
 
-  std::vector<uint8_t> buffer(message_length - sizeof(message_id));
+  *reinterpret_cast<int32_t*>(buffer.data()) = message_length;
 
   co_await boost::asio::async_read(
-      socket, boost::asio::buffer(buffer), boost::asio::use_awaitable);
+      socket, boost::asio::buffer(buffer.data() + sizeof(message_length), message_length), boost::asio::use_awaitable);
 
-  co_return parse_message(message_id, buffer);
+  co_return parse_message(buffer[sizeof(message_length)], buffer);
 }
 
-boost::asio::awaitable<Handshake> read_handshake(
-    boost::asio::ip::tcp::socket& socket)
+awaitable<Handshake> read_handshake(tcp::socket& socket)
 {
   Handshake handshake {};
 
@@ -135,8 +191,7 @@ boost::asio::awaitable<Handshake> read_handshake(
   co_return handshake;
 }
 
-boost::asio::awaitable<void> send_handshake(
-    boost::asio::ip::tcp::socket& socket, Handshake handshake)
+awaitable<void> send_handshake(tcp::socket& socket, Handshake handshake)
 {
   co_await boost::asio::async_write(
       socket,

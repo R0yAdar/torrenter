@@ -3,19 +3,25 @@
 #include <cstddef>
 #include <vector>
 
+namespace aux
+{
 class BitField
 {
-private:
-  std::vector<std::byte> m_bitfield;
+  std::vector<uint8_t> m_bitfield;
 
 public:
+  BitField();
+
   BitField(size_t piece_count);
 
-  BitField(std::vector<std::byte> bitfield);
+  BitField(std::vector<uint8_t> bitfield);
 
-  constexpr void mark(size_t piece_index, bool value);
+  void mark(size_t piece_index, bool value);
 
-  constexpr bool get(size_t piece_index);
+  bool get(size_t piece_index) const;
 
-  constexpr std::vector<std::byte> as_raw();
+  bool is_empty() const;
+
+  std::vector<uint8_t> as_raw();
 };
+}  // namespace aux

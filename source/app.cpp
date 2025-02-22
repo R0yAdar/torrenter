@@ -40,7 +40,7 @@ void App::Run()
              "\nStarted running...\n");
 
   std::string torrent_file_path =
-      "C:\\Users\\royad\\Downloads\\dexter.torrent";
+      "C:\\Users\\royad\\Downloads\\sever5.torrent";
 
   auto file = std::ifstream {torrent_file_path, std::ios::binary};
   std::stringstream file_contents {};
@@ -51,7 +51,7 @@ void App::Run()
   
   if (torrent.has_value()) {
     btr::Torrenter torrenter {*torrent};
-    torrenter.download_file("");
+    torrenter.download_file("C:\\Users\\royad\\Downloads\\s3d.mp4");
 
   } else {
     fmt::print("couldn't decode");

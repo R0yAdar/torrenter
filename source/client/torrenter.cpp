@@ -11,6 +11,7 @@
 
 #include "client/peer.hpp"
 #include "client/tracker/tracker.hpp"
+#include "client/reactor/reactor.hpp"
 
 namespace btr
 {
@@ -33,7 +34,7 @@ void Torrenter::download_file(std::filesystem::path at)
   std::smatch match;
 
   io_context resolve_io {};
-  
+
   for (auto tracker : m_torrent.trackers) {
     std::println("{}", tracker);
 
@@ -64,7 +65,7 @@ void Torrenter::download_file(std::filesystem::path at)
 
   // init context
 
-  std::vector<Peer> peers;
+  std::vector<std::shared_ptr<Peer>> peers;
 
   io_context connect_io {};
 
@@ -72,6 +73,11 @@ void Torrenter::download_file(std::filesystem::path at)
 
   context->client_id = m_peer_id;
   context->infohash = m_torrent.info_hash;
+  context->filesize = m_torrent.file_length;
+  context->piece_size = m_torrent.piece_length;
+  context->piece_count = m_torrent.piece_hashes.size();
+
+  std::cout << "FileSize: " << context->filesize << std::endl;
 
   // fetch peers
 
@@ -104,13 +110,20 @@ void Torrenter::download_file(std::filesystem::path at)
   }
 
   for (const auto& endpoint : unique_endpoints) {
-    peers.emplace_back(context, endpoint.address(), endpoint.port());
+    peers.emplace_back(std::make_shared<Peer>(
+        context, endpoint.address(), endpoint.port(), connect_io));
   }
 
   for (auto& peer : peers) {
     boost::asio::co_spawn(
-        connect_io, peer.connect_async(connect_io), boost::asio::detached);
+        connect_io, peer->start_async(), boost::asio::detached);
   }
+
+  Reactor reactor {context, peers};
+
+  boost::asio::co_spawn(connect_io,
+                        reactor.download(at.generic_string()),
+                        boost::asio::detached);
 
   connect_io.run();
 

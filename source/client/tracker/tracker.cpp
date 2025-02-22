@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <expected>
-#include <iostream>
 #include <vector>
 
 #include "client/tracker/tracker.hpp"
@@ -14,7 +13,6 @@ using boost::asio::io_context;
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
 using boost::asio::ip::udp;
-using boost::system::error_code;
 using time_point = std::chrono::steady_clock::time_point;
 using namespace boost::asio::experimental::awaitable_operators;
 using namespace std::chrono_literals;
@@ -25,7 +23,7 @@ Tracker::Tracker(std::shared_ptr<InternalContext> context,
                  address address,
                  port_type port)
     : m_context {std::move(context)}
-    , m_address {address}
+    , m_address {std::move(address)}
     , m_port {port}
 {
 }

@@ -4,7 +4,7 @@
 #include <array>
 #include <climits>
 #include <cstddef>
-#include <random>
+#include <tuple>
 #include <variant>
 
 #include "auxiliary/big_endian.hpp"
@@ -24,6 +24,7 @@ namespace btr
 
 #pragma pack(push, 1)
 
+constexpr uint8_t ID_KEEPALIVE = -1;
 constexpr uint8_t ID_CHOKE = 0;
 constexpr uint8_t ID_UNCHOKE = 1;
 constexpr uint8_t ID_INTERESTED = 2;
@@ -61,7 +62,7 @@ struct PACKED_ATTRIBUTE Handshake
 
   int8_t plen = 19;
   FixedString<19> pname {"BitTorrent protocol"};
-  uint8_t reserved[8]{0};
+  uint8_t reserved[8] {0};
   char infohash[20];
   char peer_id[20];
 };
@@ -98,6 +99,13 @@ public:
   uint32_big piece_index;
   uint32_big offset_within_piece;
   uint32_big length;
+  /*
+  auto operator<=>(const Request& o) const
+  {
+    return std::tie(piece_index, offset_within_piece, length)
+        <=> std::tie(o.piece_index, o.offset_within_piece, o.length);
+  };
+  */
 };
 
 struct PACKED_ATTRIBUTE Cancel
@@ -155,7 +163,7 @@ struct DynamicLengthMessage
     m_metadata.add_length(m_payload.size());
   }
 
-  const std::vector<uint8_t>& get_payload() const { return m_payload; }
+  std::vector<uint8_t> get_payload() const { return m_payload; }
 
   Metadata get_metadata() const { return m_metadata; }
 
