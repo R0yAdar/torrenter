@@ -36,7 +36,7 @@ public:
   uint32_t get_piece_size(size_t index) const
   {
     auto rounded_max_index = filesize / piece_size;
-    if (index <= rounded_max_index) {
+    if (index < rounded_max_index) {
       return piece_size;
     }
 

@@ -74,7 +74,7 @@ std::expected<std::vector<std::string>, TorrentFileParseError> parse_announcers(
 
 std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file)
 {
-  TorrentFile torrent;
+  TorrentFile torrent{};
 
   // Ensure the top-level structure is a dictionary
   if (file.which() != static_cast<int8_t>(BeValueTypeIndex::IDict)) {
@@ -182,6 +182,7 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
       torrent.files.push_back(
           FileItem(std::move(full_path), *length_result, offset));
       offset += *length_result;
+      torrent.file_length += *length_result;
     }
   } else if (info.contains("length")) {
     auto length_result = parse_int_field(info, "length");

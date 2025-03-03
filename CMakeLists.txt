@@ -29,8 +29,9 @@ add_library(
     "source/client/reactor/reactor.cpp"
     "source/client/downloader/downloader.hpp"
     "source/client/downloader/downloader.cpp"
-    "source/client/peer_pool/peer_pool.hpp"
-    "source/client/peer_pool/peer_pool.cpp"
+    "source/client/storage/storage.cpp"
+    "source/client/storage/storage.hpp"
+    
     "source/client/transmit/boost_transmit.hpp"
     "source/client/transmit/boost_transmit.cpp"
     "source/client/tracker/tracker.hpp"
@@ -40,7 +41,6 @@ add_library(
     "source/client/context.hpp"
     "source/auxiliary/peer_id.hpp"
      
-    "source/utp/packet.h" 
     "source/client/torrenter.cpp")
 
 target_include_directories(

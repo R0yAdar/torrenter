@@ -13,7 +13,6 @@
 #include "torrent/metadata/bencode.hpp"
 #include "torrent/metadata/torrentfile.hpp"
 #include "client/tracker/tracker.hpp"
-#include "utp/packet.h"
 
 using namespace boost;
 
@@ -40,7 +39,7 @@ void App::Run()
              "\nStarted running...\n");
 
   std::string torrent_file_path =
-      "C:\\Users\\royad\\Downloads\\sever5.torrent";
+      "C:\\Users\\royad\\Downloads\\zor.torrent";
 
   auto file = std::ifstream {torrent_file_path, std::ios::binary};
   std::stringstream file_contents {};
