@@ -1,17 +1,37 @@
 #pragma once
 
 #include <string_view>
+#include <filesystem>
 
 #include <boost/asio.hpp>
 
-class Storage
+class IStorage
 {
-  boost::asio::awaitable<void> push_piece(std::string_view info_hash,
+  boost::asio::awaitable<void> virtual push_piece(std::string_view info_hash,
                                           size_t index,
-                                          const std::vector<uint8_t>& data);
+                                          const std::vector<uint8_t>& data) = 0;
 
-  boost::asio::awaitable<bool> pull_piece(std::string_view info_hash,
+  boost::asio::awaitable<bool> virtual pull_piece(std::string_view info_hash,
                                           size_t index,
                                           size_t offset,
-                                          std::vector<uint8_t> buffer);
+                                          std::vector<uint8_t>& buffer) = 0;
+};
+
+class FileDirectoryStorage : IStorage
+{
+  std::filesystem::path m_vault;
+
+public:
+  FileDirectoryStorage(std::filesystem::path vault);
+
+  boost::asio::awaitable<void> push_piece(
+      std::string_view info_hash,
+      size_t index,
+      const std::vector<uint8_t>& data) override final;
+
+  boost::asio::awaitable<bool> pull_piece(
+      std::string_view info_hash,
+      size_t index,
+      size_t offset,
+      std::vector<uint8_t>& buffer) override final;
 };

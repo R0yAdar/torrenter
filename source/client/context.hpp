@@ -28,19 +28,19 @@ class InternalContext
 {
 public:
   PeerId client_id;
-  InfoHash infohash;
-  uint64_t filesize;
+  InfoHash info_hash;
+  uint64_t file_size;
   uint32_t piece_size;
   uint32_t piece_count;
 
   uint32_t get_piece_size(size_t index) const
   {
-    auto rounded_max_index = filesize / piece_size;
+    auto rounded_max_index = file_size / piece_size;
     if (index < rounded_max_index) {
       return piece_size;
     }
 
-    return filesize - rounded_max_index * piece_size;
+    return file_size - rounded_max_index * piece_size;
   }
 };
 

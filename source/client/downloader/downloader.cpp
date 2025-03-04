@@ -1,14 +1,22 @@
+#include <ranges>
+#include <variant>
+
 #include "downloader.hpp"
 
+#include "auxiliary/variant_aux.hpp"
 namespace btr
 {
-Downloader::Downloader(std::shared_ptr<Peer> peer,
-                       std::shared_ptr<const InternalContext> context)
-    : m_peer {std::move(peer)}
-    , m_application_context {std::move(context)}
+Downloader::Downloader(std::shared_ptr<const InternalContext> context,
+                       std::shared_ptr<Peer> peer,
+                       DownloaderPolicy policy)
+    : m_application_context {std::move(context)}
+    , m_peer {std::move(peer)}
+    , m_policy {policy}
+    , m_callback {std::make_shared<message_callback>(
+          [this](TorrentMessage m) -> boost::asio::awaitable<void>
+          { co_await triggered_on_received_message(m); })}
 {
-  m_peer->add_callback([this](TorrentMessage m) -> boost::asio::awaitable<void>
-                       { co_await triggered_on_received_message(m); });
+  m_peer->add_callback({m_callback});
 }
 
 const ExternalPeerContext& Downloader::get_context() const
@@ -16,19 +24,18 @@ const ExternalPeerContext& Downloader::get_context() const
   return m_peer->get_context();
 }
 
-boost::asio::awaitable<bool> Downloader::download_piece(size_t index)
+boost::asio::awaitable<bool> Downloader::download_piece(uint32_t index)
 {
-  std::cout << "Downloading piece: " << index << '\n';
-
   if (!m_peer->get_context().status.remote_bitfield.get(index)) {
     co_return false;
   }
 
   m_pieces[index] = FilePiece {
-      index,
-      PieceStatus::Pending,
-      std::vector<uint8_t>(m_application_context->get_piece_size(index)),
-      0};
+      .index = index,
+      .status = PieceStatus::Pending,
+      .data =
+          std::vector<uint8_t>(m_application_context->get_piece_size(index)),
+      .bytes_downloaded = 0};
 
   if (m_peer->get_context().status.self_choked) {
     co_await m_peer->send_async(TorrentMessage {Interested {}});
@@ -36,33 +43,25 @@ boost::asio::awaitable<bool> Downloader::download_piece(size_t index)
 
   auto piece_length = m_application_context->get_piece_size(index);
 
-  const uint32_t max_request_size = 8 * 1024;
-
-  for (uint32_t offset = 0; offset < piece_length; offset += max_request_size) {
+  for (uint32_t offset = 0; offset < piece_length;
+       offset += m_policy.max_block_bytes)
+  {
     auto req = Request {};
     req.piece_index = index;
     req.offset_within_piece = offset;
-    req.length = std::min(piece_length - offset, max_request_size);
+    req.length = std::min(piece_length - offset, m_policy.max_block_bytes);
 
     m_pending_requests.emplace_back(req);
   }
 
   co_await send_buffered_messages();
 
-  std::cout << "Pending requests " << m_pending_requests.size() << std::endl;
-
   co_return true;
 }
 
 void Downloader::handle_piece(const Piece& piece)
 {
-  std::cout << "Got piece block " << piece.get_metadata().piece_index << "  "
-            << piece.get_payload().size() << "\n";
-
   if (!m_pieces.contains(piece.get_metadata().piece_index)) {
-    std::cout << "Got piece index: " << piece.get_metadata().piece_index
-              << " without asking.\n";
-
     return;
   }
 
@@ -74,17 +73,11 @@ void Downloader::handle_piece(const Piece& piece)
 
   FilePiece& current_piece = m_pieces[piece.get_metadata().piece_index];
 
-  std::copy(
-      data.cbegin(),
-      data.cend(),
+  std::ranges::copy(
+      data,
       current_piece.data.begin() + piece.get_metadata().offset_within_piece);
 
   current_piece.bytes_downloaded += data.size();
-
-  if (current_piece.bytes_downloaded > current_piece.data.size()) {
-    std::cout << "EXCEEDED PIECE SIZE BY (MAYBE CHOKE RELATED...) "
-              << current_piece.data.size() << std::endl;
-  }
 
   if (current_piece.bytes_downloaded == current_piece.data.size()) {
     current_piece.status = PieceStatus::Complete;
@@ -93,39 +86,56 @@ void Downloader::handle_piece(const Piece& piece)
   }
 }
 
-
 boost::asio::awaitable<void> Downloader::triggered_on_received_message(
     TorrentMessage trigger)
 {
-  if (trigger.index() == 0) {
-    co_await m_peer->send_async(TorrentMessage {Keepalive {}});
-  } else if (trigger.index() == ID_UNCHOKE + 1) {
-    co_await send_buffered_messages();
-  } else if (trigger.index() == ID_CHOKE + 1) {
-    for (auto& reqi : m_active_requests) {
-      auto req = Request {};
-      req.piece_index = reqi.piece_index;
-      req.offset_within_piece = reqi.piece_offset;
-      req.length = reqi.block_length;
-      m_pending_requests.push_front(req);
+  bool should_try_sending_messages = false;
+  bool should_choke_active_requests = false;
+  bool should_handle_piece = false;
+
+  std::visit(
+      overloaded {
+          [](auto&) {},
+          [&should_try_sending_messages](Unchoke)
+          { should_try_sending_messages = true; },
+          [&should_try_sending_messages, &should_choke_active_requests](Choke)
+          {
+            should_choke_active_requests = true;
+            should_try_sending_messages = true;
+          },
+          [&should_try_sending_messages, &should_handle_piece](Piece)
+          {
+            should_handle_piece = true;
+            should_try_sending_messages = true;
+          }},
+      trigger);
+
+  if (should_handle_piece) {
+    handle_piece(std::get<Piece>(trigger));
+  }
+
+  if (should_choke_active_requests) {
+    for (auto& identifier : m_active_requests) {
+      m_pending_requests.emplace_front(identifier.piece_index,
+                                       identifier.piece_offset,
+                                       identifier.block_length);
     }
 
     m_active_requests.clear();
-  } else if (trigger.index() == ID_PIECE + 1) {
-    handle_piece(std::get<Piece>(trigger));
+  }
+
+  if (should_try_sending_messages) {
     co_await send_buffered_messages();
   }
 }
 
 boost::asio::awaitable<void> Downloader::send_buffered_messages()
 {
-  while (!m_peer->get_context().status.self_choked && !m_pending_requests.empty()
-         && m_active_requests.size() < 7)
+  while (
+      !m_peer->get_context().status.self_choked && !m_pending_requests.empty()
+      && m_active_requests.size() < m_policy.max_concurrent_outgoing_requests)
   {
     auto req = m_pending_requests.front();
-    std::cout << "Sending request for: " << req.piece_index << " at offset "
-              << req.offset_within_piece << "  and length of " << req.length
-              << std::endl;
 
     m_active_requests.emplace(
         req.piece_index, req.offset_within_piece, req.length);

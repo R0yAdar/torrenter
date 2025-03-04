@@ -27,10 +27,10 @@ public:
           std::vector<std::shared_ptr<Peer>> peers)
       : m_context {context}
       , m_peers {}
-      , m_file(context->filesize)
+      , m_file(context->file_size)
   {
     for (auto& peer : peers) {
-      m_peers.push_back(std::make_shared<Downloader>(peer, m_context));
+      m_peers.push_back(std::make_shared<Downloader>(m_context, peer));
     }
   }
 
@@ -39,7 +39,7 @@ public:
     std::cout << "Piece count: " << m_context->piece_count << std::endl;
     std::cout << "Piece size: " << m_context->piece_size << std::endl;
 
-    std::cout << "File size: " << m_context->filesize << std::endl;
+    std::cout << "File size: " << m_context->file_size << std::endl;
 
     std::queue<std::weak_ptr<Downloader>> peers {};
 

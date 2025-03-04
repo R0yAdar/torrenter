@@ -62,8 +62,7 @@ awaitable<void> Peer::connect_async()
       std::string(handshake.peer_id, sizeof(handshake.peer_id));
 }
 
-void Peer::add_callback(
-    std::function<boost::asio::awaitable<void>(TorrentMessage)> callback)
+void Peer::add_callback(std::weak_ptr<message_callback> callback)
 {
   m_callbacks.push_back(std::move(callback));
 }
@@ -98,7 +97,8 @@ void assign_bitfield(const std::vector<uint8_t>& raw_bitfield,
 
 void mark_bitfield(uint32_t index, PeerStatus& status)
 {
-  status.remote_bitfield.mark(index, true);
+  constexpr bool HAS_INDEX = true;
+  status.remote_bitfield.mark(index, HAS_INDEX);
 }
 }  // namespace
 
@@ -115,7 +115,7 @@ void Peer::handle_message(TorrentMessage message)
           { mark_bitfield(have.piece_index, m_context->status); },
           [&](const BitField& bitfield)
           { assign_bitfield(bitfield.get_payload(), m_context->status); },
-          [&](const Request&) {},
+          [](const Request&) {},
           [](const Piece&) {},
           [](const Cancel&) {},
           [](const Port&) {},
@@ -127,16 +127,16 @@ awaitable<void> Peer::receive_loop_async()
 {
   while (m_is_running) {
     try {
-      auto message = co_await read_message(m_socket);
-
-      if (message) {
+      if (auto message = co_await read_message(m_socket)) {
         std::cout << m_context->peer_id << "RType: " << message->index()
                   << std::endl;
 
         handle_message(*message);
 
         for (auto const& callback : m_callbacks) {
-          co_await callback(*message);
+          if (auto spt = callback.lock()) {
+            co_await (*spt)(*message);
+          }
         }
       } else {
         std::cout << "Message parsing error: "

@@ -16,9 +16,8 @@ BitField::BitField(size_t piece_count)
 }
 
 BitField::BitField(std::vector<uint8_t> bitfield)
-    : m_bitfield(bitfield.size())
+    : m_bitfield(std::move(bitfield))
 {
-  std::copy(bitfield.cbegin(), bitfield.cend(), m_bitfield.begin());
 }
 
 void BitField::mark(size_t piece_index, bool value)

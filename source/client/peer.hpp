@@ -1,10 +1,7 @@
 #pragma once
 
-#include <deque>
 #include <functional>
-#include <map>
 #include <memory>
-#include <set>
 
 #include <boost/asio.hpp>
 #include <boost/asio/experimental/awaitable_operators.hpp>
@@ -17,6 +14,10 @@ namespace btr
 {
 using channel_t = boost::asio::experimental::channel<void(
     boost::system::error_code, TorrentMessage)>;
+
+using message_callback =
+    std::function<boost::asio::awaitable<void>(TorrentMessage)>;
+
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
 
@@ -33,8 +34,7 @@ class Peer
   boost::asio::ip::tcp::socket m_socket;
   bool m_is_running;
 
-  std::vector<std::function<boost::asio::awaitable<void>(TorrentMessage)>>
-      m_callbacks;
+  std::vector<std::weak_ptr<message_callback>> m_callbacks;
 
 public:
   Peer(std::shared_ptr<const InternalContext> context,
@@ -45,8 +45,7 @@ public:
 
   const ExternalPeerContext& get_context() const;
 
-  void add_callback(
-      std::function<boost::asio::awaitable<void>(TorrentMessage)> callback);
+  void add_callback(std::weak_ptr<message_callback>);
 
   boost::asio::awaitable<void> start_async();
 

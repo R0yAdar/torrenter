@@ -55,7 +55,7 @@ struct PACKED_ATTRIBUTE Handshake
               context.client_id.get_id().cend(),
               peer_id);
 
-    std::copy(context.infohash.cbegin(), context.infohash.cend(), infohash);
+    std::copy(context.info_hash.cbegin(), context.info_hash.cend(), infohash);
   }
 
   Handshake() = default;
@@ -92,6 +92,9 @@ public:
 
 struct PACKED_ATTRIBUTE Request
 {
+  Request() {  }
+  Request(uint32_t piece_index, uint32_t offset, uint32_t length) {  }
+
 private:
   MessageMetadata<13, ID_REQUEST> metadata;
 

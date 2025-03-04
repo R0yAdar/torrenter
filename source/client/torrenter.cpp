@@ -72,12 +72,12 @@ void Torrenter::download_file(std::filesystem::path at)
   auto context = std::make_shared<InternalContext>();
 
   context->client_id = m_peer_id;
-  context->infohash = m_torrent.info_hash;
-  context->filesize = m_torrent.file_length;
+  context->info_hash = m_torrent.info_hash;
+  context->file_size = m_torrent.file_length;
   context->piece_size = m_torrent.piece_length;
   context->piece_count = m_torrent.piece_hashes.size();
 
-  std::cout << "FileSize: " << context->filesize << std::endl;
+  std::cout << "FileSize: " << context->file_size << std::endl;
 
   // fetch peers
 

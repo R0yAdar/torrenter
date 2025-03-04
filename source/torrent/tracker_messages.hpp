@@ -66,10 +66,10 @@ struct PACKED_ATTRIBUTE AnnounceRequest
               context.client_id.get_id().cend(),
               peer_id);
 
-    std::copy(context.infohash.cbegin(), context.infohash.cend(), info_hash);
+    std::copy(context.info_hash.cbegin(), context.info_hash.cend(), info_hash);
 
     downloaded = 0;
-    left = context.filesize;
+    left = context.file_size;
     key = generate_random_in_range<uint32_t, 0, UINT32_MAX>();
     port = 2929;
   }
