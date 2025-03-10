@@ -43,9 +43,13 @@ public:
 
   const ExternalPeerContext& get_context() const;
 
+  const PeerActivity& get_activity() const;
+
   boost::asio::awaitable<bool> download_piece(uint32_t index);
 
   boost::asio::awaitable<std::optional<FilePiece>> retrieve_piece(size_t index);
+
+  boost::asio::awaitable<void> restart_connection();
 
 private:
   boost::asio::awaitable<void> triggered_on_received_message(

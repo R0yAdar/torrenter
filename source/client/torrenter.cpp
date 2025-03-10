@@ -53,7 +53,6 @@ void Torrenter::download_file(std::filesystem::path at)
             boost::asio::ip::udp::endpoint endpoint =
                 *(co_await resolver.async_resolve(query));
             endpoints.push_back(endpoint);
-            std::cout << endpoint << std::endl;
           },
           boost::asio::detached);
     }
@@ -65,14 +64,15 @@ void Torrenter::download_file(std::filesystem::path at)
 
   // init context
 
-  std::vector<std::shared_ptr<Peer>> peers;
+  std::vector<PeerContactInfo> peers;
 
   io_context connect_io {};
 
   auto context = std::make_shared<InternalContext>();
 
   context->client_id = m_peer_id;
-  context->info_hash = m_torrent.info_hash;
+  context->info_hash = std::vector(m_torrent.info_hash.cbegin(),
+                                            m_torrent.info_hash.cend());
   context->file_size = m_torrent.file_length;
   context->piece_size = m_torrent.piece_length;
   context->piece_count = m_torrent.piece_hashes.size();
@@ -108,21 +108,15 @@ void Torrenter::download_file(std::filesystem::path at)
   for (auto& peer : swarm) {
     unique_endpoints.insert(peer);
   }
+    
+  Reactor reactor {context};
 
-  for (const auto& endpoint : unique_endpoints) {
-    peers.emplace_back(std::make_shared<Peer>(
-        context, endpoint.address(), endpoint.port(), connect_io));
+  for (auto& endpoint : unique_endpoints) {
+    peers.push_back(PeerContactInfo {endpoint.address(), endpoint.port()});
   }
-
-  for (auto& peer : peers) {
-    boost::asio::co_spawn(
-        connect_io, peer->start_async(), boost::asio::detached);
-  }
-
-  Reactor reactor {context, peers};
 
   boost::asio::co_spawn(connect_io,
-                        reactor.download(at.generic_string()),
+                        reactor.download(at.generic_string(), peers),
                         boost::asio::detached);
 
   connect_io.run();

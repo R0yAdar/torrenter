@@ -32,7 +32,7 @@ void BitField::mark(size_t piece_index, bool value)
   size_t value_index =
       piece_index % (sizeof(decltype(m_bitfield)::value_type) * 8);
 
-  uint8_t mask = 1 << value_index;
+  uint8_t mask = 1 << (7 - value_index);
 
   if (value) {
     m_bitfield[container_index] |= mask;
@@ -53,7 +53,7 @@ bool BitField::get(size_t piece_index) const
   size_t value_index =
       piece_index % (sizeof(decltype(m_bitfield)::value_type) * 8);
 
-  uint8_t mask = 1 << value_index;
+  uint8_t mask = 1 << (7 - value_index);
 
   return (mask & m_bitfield[container_index]) > 0;
 }

@@ -1,13 +1,12 @@
 #pragma once
-#include <array>
+#include <vector>
 #include <chrono>
-#include <iostream>
 #include "auxiliary/peer_id.hpp"
 #include "torrent/bitfield/bitfield.hpp"
 
 namespace btr
 {
-using InfoHash = std::array<uint8_t, 20>;
+using InfoHash = std::vector<uint8_t>;
 
 enum class PieceStatus : uint8_t
 {
@@ -33,6 +32,16 @@ public:
   uint32_t piece_size;
   uint32_t piece_count;
 
+  std::string info_hash_as_string() const
+  {
+    std::string result;
+    for (uint8_t byte : info_hash) {
+      result += std::format("{:02x}", byte);
+    }
+
+    return result;
+  }
+
   uint32_t get_piece_size(size_t index) const
   {
     auto rounded_max_index = file_size / piece_size;
@@ -50,6 +59,7 @@ struct PeerStatus
 
   bool remote_choked;
   bool remote_interested;
+
   aux::BitField remote_bitfield;
 
   std::chrono::steady_clock::time_point last_message_timestamp;

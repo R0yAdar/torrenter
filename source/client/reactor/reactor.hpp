@@ -9,131 +9,93 @@
 
 #include "client/context.hpp"
 #include "client/downloader/downloader.hpp"
-
-using namespace std::chrono_literals;
+#include "client/storage/storage.hpp"
+#include "strategy/strategy.hpp"
 
 namespace btr
 {
+using namespace std::chrono_literals;
 class Reactor
 {
 private:
   std::shared_ptr<InternalContext> m_context;
-  std::vector<std::shared_ptr<Downloader>> m_peers;
-  std::map<int32_t, std::vector<std::weak_ptr<Downloader>>> m_pieces;
-  std::vector<uint8_t> m_file;
+  std::shared_ptr<IStorage> m_storage_device;
+  std::unique_ptr<IStrategy> m_strategy;
 
 public:
-  Reactor(std::shared_ptr<InternalContext> context,
-          std::vector<std::shared_ptr<Peer>> peers)
+  Reactor(std::shared_ptr<InternalContext> context)
       : m_context {context}
-      , m_peers {}
-      , m_file(context->file_size)
+      , m_storage_device {std::make_shared<FileDirectoryStorage>(
+            std::filesystem::path {"C:\\torrents"})}
   {
-    for (auto& peer : peers) {
-      m_peers.push_back(std::make_shared<Downloader>(m_context, peer));
-    }
+    m_strategy = std::make_unique<RandomPieceStrategy>(m_context, m_storage_device);
   }
 
-  boost::asio::awaitable<void> assign()
+  boost::asio::awaitable<void> download(std::string filepath,
+                                        const std::vector<PeerContactInfo>& peers)
   {
-    std::cout << "Piece count: " << m_context->piece_count << std::endl;
-    std::cout << "Piece size: " << m_context->piece_size << std::endl;
+    try {
+      co_await m_strategy->include(peers);
 
-    std::cout << "File size: " << m_context->file_size << std::endl;
+      {
+        boost::asio::steady_timer timer(
+            co_await boost::asio::this_coro::executor);
+        timer.expires_from_now(10s);
 
-    std::queue<std::weak_ptr<Downloader>> peers {};
+        co_await timer.async_wait(boost::asio::use_awaitable);
 
-    for (auto& peer : m_peers) {
-      peers.push(peer);
-    }
-
-    for (size_t piece_index = 0; piece_index < m_context->piece_count; piece_index++) {
-      auto count = m_pieces[piece_index].size();
-      int tries = 0;
-
-      while (count < 3 && tries++ < m_peers.size()) {
-        auto peer = peers.front().lock();
-
-        if (peer->get_context().status.remote_bitfield.get(piece_index)) {
-          std::cout << peer->get_context().peer_id
-                    << " Assigned: " << piece_index << "\n";
-          co_await peer->download_piece(piece_index);
-          ++count;
-          m_pieces[piece_index].push_back(peer);
-        }
-
-        peers.pop();
-        peers.push(peer);
+        co_await m_strategy->assign();
       }
-    }
-  }
 
-  boost::asio::awaitable<bool> is_completed()
-  {
-    std::vector<int32_t> completed_indexes {};
+      std::cout << "Finished assigning\n";
 
-    for (auto& [piece_index, peers] : m_pieces) {
-      for (auto& peer : peers) {
-        auto locked_peer = peer.lock();
-        auto opt_piece = co_await locked_peer->retrieve_piece(piece_index);
+      while (true) {
+        boost::asio::steady_timer timer(
+            co_await boost::asio::this_coro::executor);
+        timer.expires_from_now(3s);
 
-        if (opt_piece) {
-          FilePiece piece = *opt_piece;
-          if (piece.status == PieceStatus::Complete) {
-            std::cout << "Finished downloading piece " << piece_index << '\n';
+        co_await timer.async_wait(boost::asio::use_awaitable);
 
-            std::copy(piece.data.cbegin(),
-                      piece.data.cend(),
-                      m_file.begin() + piece.index * m_context->piece_size);
+        co_await m_strategy->revoke();
+        co_await m_strategy->assign();
 
-            completed_indexes.push_back(piece_index);
-
-          } else if (piece.status == PieceStatus::Pending) {
-            // std::cout << "Pending piece: " << piece_index << '\n';
-          } else if (piece.status == PieceStatus::Active) {
-            std::cout << "Active piece: " << piece_index
-                      << " downloaded: " << piece.bytes_downloaded << '\n';
-          }
-        }
+        if (co_await m_strategy->is_done())
+          break;
       }
+
+      auto info_hash = m_context->info_hash_as_string();
+
+      if (std::filesystem::exists(filepath)) {
+        std::cout << "DOWNLOADED\n";
+
+        co_return;
+      }
+
+      boost::asio::stream_file ofile {
+          co_await boost::asio::this_coro::executor,
+          filepath,
+          boost::asio::stream_file::flags::write_only
+              | boost::asio::stream_file::flags::create};
+
+      uint32_t index = 0;
+
+      std::vector<uint8_t> buffer(m_context->get_piece_size(0));
+
+      while (m_storage_device->exists(info_hash, index)) {
+        auto path = std::filesystem::path("C:\\torrents") / info_hash
+            / (std::to_string(index) + ".tp");
+
+        co_await m_storage_device->pull_piece(info_hash, index, 0, buffer);
+
+        co_await boost::asio::async_write(
+            ofile,
+            boost::asio::buffer(buffer, m_context->get_piece_size(index)),
+            boost::asio::use_awaitable);
+        ++index;
+      }
+    } catch (std::exception& ex) {
+      std::cout << ex.what() << std::endl;
     }
-
-    for (auto index : completed_indexes) {
-      m_pieces.erase(index);
-    }
-
-    co_return m_pieces.size() == 0;
-  }
-
-  boost::asio::awaitable<void> download(std::string filepath)
-  {
-    {
-      boost::asio::steady_timer timer(
-          co_await boost::asio::this_coro::executor);
-      timer.expires_from_now(10s);
-
-      co_await timer.async_wait(boost::asio::use_awaitable);
-
-      co_await assign();
-    }
-    while (true) {
-      boost::asio::steady_timer timer(
-          co_await boost::asio::this_coro::executor);
-      timer.expires_from_now(10s);
-
-      co_await timer.async_wait(boost::asio::use_awaitable);
-
-      if (co_await is_completed())
-        break;
-    }
-    std::ofstream file(filepath,
-                       std::ios::binary);  // Open file in binary mode
-    if (!file) {
-      std::cerr << "Error opening file for writing: " << filepath << std::endl;
-      co_return;
-    }
-    file.write(reinterpret_cast<const char*>(m_file.data()), m_file.size());
-    file.close();
   }
 };
 }  // namespace btr

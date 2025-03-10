@@ -32,12 +32,14 @@ add_library(
     "source/client/storage/storage.cpp"
     "source/client/storage/storage.hpp"
     
-    "source/client/transmit/boost_transmit.hpp"
-    "source/client/transmit/boost_transmit.cpp"
+    "source/client/transmit/transmit.hpp"
+    "source/client/transmit/transmit.cpp"
     "source/client/tracker/tracker.hpp"
     "source/client/tracker/tracker.cpp"
     "source/client/peer.hpp"
     "source/client/peer.cpp"
+    "source/client/reactor/strategy/strategy.hpp"
+    "source/client/reactor/strategy/strategy.cpp"
     "source/client/context.hpp"
     "source/auxiliary/peer_id.hpp"
      

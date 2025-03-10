@@ -7,6 +7,7 @@
 
 class IStorage
 {
+public:
   boost::asio::awaitable<void> virtual push_piece(std::string_view info_hash,
                                           size_t index,
                                           const std::vector<uint8_t>& data) = 0;
@@ -15,10 +16,14 @@ class IStorage
                                           size_t index,
                                           size_t offset,
                                           std::vector<uint8_t>& buffer) = 0;
+
+  bool virtual exists(std::string_view info_hash, size_t index) = 0;
 };
 
-class FileDirectoryStorage : IStorage
+class FileDirectoryStorage : public IStorage
 {
+  const std::string SUFFIX = ".tp";
+
   std::filesystem::path m_vault;
 
 public:
@@ -34,4 +39,6 @@ public:
       size_t index,
       size_t offset,
       std::vector<uint8_t>& buffer) override final;
+
+  bool exists(std::string_view info_hash, size_t index) override final;
 };

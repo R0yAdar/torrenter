@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include "bitTorrent/bencode.hpp"
+#include "torrent/metadata/bencode.hpp"
 
 TEST_CASE("Decodes int correctly", "[library]")
 {

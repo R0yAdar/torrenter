@@ -10,6 +10,7 @@
 #include <boost/version.hpp>
 #include <fmt/color.h>
 
+#include "client/peer.hpp"
 #include "torrent/metadata/bencode.hpp"
 #include "torrent/metadata/torrentfile.hpp"
 #include "client/tracker/tracker.hpp"
@@ -39,18 +40,26 @@ void App::Run()
              "\nStarted running...\n");
 
   std::string torrent_file_path =
-      "C:\\Users\\royad\\Downloads\\zor.torrent";
+      "C:\\Users\\royad\\Downloads\\dune.torrent";
 
   auto file = std::ifstream {torrent_file_path, std::ios::binary};
+
   std::stringstream file_contents {};
   file_contents << file.rdbuf();
   bencode::BDecoder decoder {};
+
   auto bencoded_torrent = decoder(file_contents.str());
+
   auto torrent = btr::load_torrent_file(bencoded_torrent);
-  
+
   if (torrent.has_value()) {
     btr::Torrenter torrenter {*torrent};
-    torrenter.download_file("C:\\Users\\royad\\Downloads\\s3d.mp4");
+
+    try {
+      torrenter.download_file("C:\\Users\\royad\\Downloads\\duney.mp4");
+    } catch (std::exception& e) {
+      std::cout << e.what() << std::endl;
+    }
 
   } else {
     fmt::print("couldn't decode");

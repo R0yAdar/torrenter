@@ -2,7 +2,7 @@
 #include <iostream>
 #include <utility>
 
-#include "client/transmit/boost_transmit.hpp"
+#include "client/transmit/transmit.hpp"
 
 namespace btr
 {
@@ -126,7 +126,8 @@ std::expected<TorrentMessage, ParseError> parse_message(
       return reinterpret_safely<Have>(data).transform(
           [](auto* value) { return Have {*value}; });
     case ID_BITFIELD:
-      return BitField {data};
+        // TODO, add get_metadata to all
+      return BitField {std::vector(data.cbegin() + 4  + 1, data.cend())};
     case ID_REQUEST:
       return reinterpret_safely<Request>(data).transform(
           [](auto* value) { return Request {*value}; });

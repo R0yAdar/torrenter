@@ -4,6 +4,7 @@
 #include "downloader.hpp"
 
 #include "auxiliary/variant_aux.hpp"
+
 namespace btr
 {
 Downloader::Downloader(std::shared_ptr<const InternalContext> context,
@@ -23,6 +24,12 @@ const ExternalPeerContext& Downloader::get_context() const
 {
   return m_peer->get_context();
 }
+
+const PeerActivity& Downloader::get_activity() const
+{
+  return m_peer->get_activity();
+}
+
 
 boost::asio::awaitable<bool> Downloader::download_piece(uint32_t index)
 {
@@ -160,5 +167,11 @@ boost::asio::awaitable<std::optional<FilePiece>> Downloader::retrieve_piece(
                        .status = m_pieces[index].status,
                        .bytes_downloaded = m_pieces[index].bytes_downloaded};
 }
+
+boost::asio::awaitable<void> Downloader::restart_connection()
+{
+  return m_peer->start_async();
+}
+
 
 }  // namespace btr

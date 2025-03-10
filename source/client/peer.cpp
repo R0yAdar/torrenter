@@ -8,7 +8,7 @@
 #include <boost/asio/experimental/awaitable_operators.hpp>
 
 #include "auxiliary/variant_aux.hpp"
-#include "client/transmit/boost_transmit.hpp"
+#include "client/transmit/transmit.hpp"
 #include "torrent/messages.hpp"
 
 using boost::asio::awaitable;
@@ -19,54 +19,6 @@ using namespace boost::asio::experimental::awaitable_operators;
 
 namespace btr
 {
-
-Peer::Peer(std::shared_ptr<const InternalContext> context,
-           address address,
-           port_type port,
-           boost::asio::io_context& io,
-           size_t max_outgoing_messages)
-    : m_address {std::move(address)}
-    , m_port {port}
-    , m_application_context {std::move(context)}
-    , m_context {std::make_shared<ExternalPeerContext>()}
-    , m_send_queue {io, max_outgoing_messages}
-    , m_socket {io}
-    , m_is_running {true}
-{
-}
-
-const ExternalPeerContext& Peer::get_context() const
-{
-  return *m_context;
-}
-
-awaitable<void> Peer::start_async()
-{
-  co_await connect_async();
-  co_await (receive_loop_async() && send_loop_async());
-}
-
-awaitable<void> Peer::connect_async()
-{
-  co_await m_socket.async_connect(tcp::endpoint(m_address, m_port),
-                                  boost::asio::use_awaitable);
-  {
-    btr::Handshake handshake {*m_application_context};
-
-    co_await send_handshake(m_socket, handshake);
-  }
-
-  auto handshake = co_await read_handshake(m_socket);
-
-  m_context->peer_id =
-      std::string(handshake.peer_id, sizeof(handshake.peer_id));
-}
-
-void Peer::add_callback(std::weak_ptr<message_callback> callback)
-{
-  m_callbacks.push_back(std::move(callback));
-}
-
 namespace
 {
 void handle_keep_alive(PeerStatus& status) {}
@@ -102,6 +54,64 @@ void mark_bitfield(uint32_t index, PeerStatus& status)
 }
 }  // namespace
 
+Peer::Peer(std::shared_ptr<const InternalContext> context,
+           PeerContactInfo peer_info,
+           boost::asio::any_io_executor& io,
+           size_t max_outgoing_messages)
+    : m_contact_info {std::move(peer_info)}
+    , m_application_context {std::move(context)}
+    , m_context {std::make_shared<ExternalPeerContext>()}
+    , m_send_queue {io, max_outgoing_messages}
+    , m_socket {io}
+{
+}
+
+const ExternalPeerContext& Peer::get_context() const
+{
+  return *m_context;
+}
+
+const PeerActivity& Peer::get_activity() const
+{
+  return m_activity;
+}
+
+awaitable<void> Peer::start_async()
+{
+  if (!m_activity.is_active) {
+    m_activity.is_active = true;
+    m_is_stopping = false;
+
+    co_await connect_async();
+    co_await (receive_loop_async() && send_loop_async());
+  }
+
+  std::cout << m_context->peer_id << " Exited\n";
+
+  m_activity.is_active = false;
+}
+
+awaitable<void> Peer::connect_async()
+{
+  co_await m_socket.async_connect(tcp::endpoint(m_contact_info.address, m_contact_info.port),
+                                  boost::asio::use_awaitable);
+  {
+    btr::Handshake handshake {*m_application_context};
+
+    co_await send_handshake(m_socket, handshake);
+  }
+
+  auto handshake = co_await read_handshake(m_socket);
+
+  m_context->peer_id =
+      std::string(handshake.peer_id, sizeof(handshake.peer_id));
+}
+
+void Peer::add_callback(std::weak_ptr<message_callback> callback)
+{
+  m_callbacks.push_back(std::move(callback));
+}
+
 void Peer::handle_message(TorrentMessage message)
 {
   m_context->status.last_message_timestamp = std::chrono::steady_clock::now();
@@ -125,11 +135,13 @@ void Peer::handle_message(TorrentMessage message)
 
 awaitable<void> Peer::receive_loop_async()
 {
-  while (m_is_running) {
+  m_activity.is_receiver_active = true;
+
+  while (!m_is_stopping) {
     try {
       if (auto message = co_await read_message(m_socket)) {
-        std::cout << m_context->peer_id << "RType: " << message->index()
-                  << std::endl;
+
+        //std::cout << m_context->peer_id << " RType" << message->index() << '\n';
 
         handle_message(*message);
 
@@ -139,31 +151,47 @@ awaitable<void> Peer::receive_loop_async()
           }
         }
       } else {
-        std::cout << "Message parsing error: "
-                  << static_cast<int>(message.error()) << std::endl;
+        m_activity.latest_parse_errors.push_back(message.error());
       }
 
     } catch (const std::exception& e) {
+      m_activity.receiver_exit_message = e.what();
+      break;
     }
   }
+
+  if (m_activity.is_sender_active) {
+    co_await internal_stop_sender();
+  }
+
+  m_activity.is_receiver_active = false;
 }
 
 awaitable<void> Peer::send_loop_async()
 {
-  while (m_is_running) {
+  m_activity.is_sender_active = true;
+
+  while (!m_is_stopping) {
     try {
       auto message =
           co_await m_send_queue.async_receive(boost::asio::use_awaitable);
 
-      std::cout << m_context->peer_id << " SType" << message.index() << '\n';
+      // std::cout << m_context->peer_id << " SType" << message.index() << '\n';
+
+      if (m_is_stopping) {
+        break;
+      }
 
       co_await send_message(m_socket, message);
 
     } catch (const std::exception& e) {
-      std::cout << m_context->peer_id << " " << m_address
-                << "EXCEPTION: " << e.what();
+      m_activity.sender_exit_message = e.what();
+      break;
     }
   }
+
+  m_send_queue.reset();
+  m_activity.is_sender_active = false;
 }
 
 awaitable<void> Peer::send_async(TorrentMessage message)
@@ -172,9 +200,10 @@ awaitable<void> Peer::send_async(TorrentMessage message)
       boost::system::error_code {}, message, boost::asio::use_awaitable);
 }
 
-void Peer::stop()
+awaitable<void> Peer::internal_stop_sender()
 {
-  m_is_running = false;
+  m_is_stopping = true;
+  co_await m_send_queue.async_send(
+      boost::system::error_code {}, {Keepalive {}}, boost::asio::use_awaitable);
 }
-
 }  // namespace btr
