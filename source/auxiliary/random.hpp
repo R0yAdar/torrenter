@@ -1,4 +1,5 @@
 #pragma once
+
 #include <random>
 
 template<typename T, T Min, T Max>

@@ -10,9 +10,8 @@ FileDirectoryStorage::FileDirectoryStorage(std::filesystem::path vault)
 {
 }
 
-/// TODO: make this return bool
 boost::asio::awaitable<void> FileDirectoryStorage::push_piece(
-    std::string_view info_hash, size_t index, const std::vector<uint8_t>& data)
+    std::string_view info_hash, size_t index, const std::vector<uint8_t>& data, bool overwrite)
 {
   auto path = m_vault / info_hash;
 
@@ -20,9 +19,9 @@ boost::asio::awaitable<void> FileDirectoryStorage::push_piece(
     std::filesystem::create_directories(path);
   }
 
-  path /= (std::to_string(index) + SUFFIX);
+  path /= std::to_string(index);
 
-  if (std::filesystem::exists(path)) {
+  if ((!overwrite) && std::filesystem::exists(path)) {
     co_return;
   }
 
@@ -41,7 +40,7 @@ boost::asio::awaitable<bool> FileDirectoryStorage::pull_piece(
     size_t amount,
     std::vector<uint8_t>& buffer)
 {
-  auto path = m_vault / info_hash / (std::to_string(index) + SUFFIX);
+  auto path = m_vault / info_hash / std::to_string(index);
 
   if ((!std::filesystem::exists(path)) || (buffer.size() < amount)) {
     co_return false;
@@ -60,7 +59,7 @@ boost::asio::awaitable<bool> FileDirectoryStorage::pull_piece(
 
 bool FileDirectoryStorage::exists(std::string_view info_hash, size_t index)
 {
-  auto path = m_vault / info_hash / (std::to_string(index) + SUFFIX);
+  auto path = m_vault / info_hash / std::to_string(index);
 
   return std::filesystem::exists(path);
 }

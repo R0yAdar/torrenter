@@ -12,12 +12,12 @@
 
 #include "torrent/metadata/bencode.hpp"
 #include "torrent/metadata/torrentfile.hpp"
-#include "client/tracker/tracker.hpp"
+#include "client/torrenter.hpp"
 
 using namespace boost;
 
 App::App(std::filesystem::path piece_vault_root)
-    : m_piece_vault {std::make_shared<FileDirectoryStorage>(piece_vault_root)}
+    : m_piece_vault {std::make_shared<FileDirectoryStorage>(std::move(piece_vault_root))}
 {
   fmt::print(fg(fmt::color::aqua) | fmt::emphasis::bold | fmt::emphasis::italic,
              "Welcome to torrenter!\n");

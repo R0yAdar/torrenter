@@ -52,7 +52,7 @@ class Peer
 public:
   Peer(std::shared_ptr<const InternalContext> context,
        PeerContactInfo peer_info,
-       boost::asio::any_io_executor& io,
+       const boost::asio::any_io_executor& io,
        size_t max_outgoing_messages = 10);
 
   const ExternalPeerContext& get_context() const;

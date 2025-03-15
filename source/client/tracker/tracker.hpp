@@ -1,12 +1,9 @@
 #pragma once
-#include <expected>
 #include <memory>
 
 #include <boost/asio.hpp>
 
 #include "client/context.hpp"
-#include "client/torrenter.hpp"
-#include "torrent/tracker_messages.hpp"
 
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;

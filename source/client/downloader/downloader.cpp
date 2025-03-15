@@ -1,4 +1,3 @@
-#include <iostream>
 #include <variant>
 
 #include "downloader.hpp"
@@ -34,8 +33,6 @@ const PeerActivity& Downloader::get_activity() const
 
 boost::asio::awaitable<bool> Downloader::download_piece(uint32_t index)
 {
-  std::cout << "Downloader - " << m_peer->get_context().contact_info.address
-            << ": " << index << "(piece)" << std::endl;
   if (!m_peer->get_context().status.remote_bitfield.get(index)) {
     co_return false;
   }
@@ -181,7 +178,7 @@ boost::asio::awaitable<std::optional<FilePiece>> Downloader::retrieve_piece(
                        .bytes_downloaded = m_pieces[index].bytes_downloaded};
 }
 
-boost::asio::awaitable<void> Downloader::restart_connection()
+boost::asio::awaitable<void> Downloader::restart_connection() const
 {
   return m_peer->start_async();
 }

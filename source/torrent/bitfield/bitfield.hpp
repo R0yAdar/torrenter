@@ -10,7 +10,7 @@ class BitField
   std::vector<uint8_t> m_bitfield;
 
 public:
-  BitField();
+  BitField() = default;
 
   BitField(size_t piece_count);
 

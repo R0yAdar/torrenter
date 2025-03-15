@@ -1,4 +1,4 @@
-#include <algorithm>
+#include <ranges>
 #include <expected>
 #include <vector>
 
@@ -9,7 +9,6 @@
 
 #include "torrent/tracker_messages.hpp"
 
-using boost::asio::io_context;
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
 using boost::asio::ip::udp;
@@ -19,15 +18,8 @@ using namespace std::chrono_literals;
 
 namespace btr
 {
-Tracker::Tracker(std::shared_ptr<InternalContext> context,
-                 address address,
-                 port_type port)
-    : m_context {std::move(context)}
-    , m_address {std::move(address)}
-    , m_port {port}
+namespace
 {
-}
-
 template<typename T>
 concept UdpTrackerMessage = requires(const T ptr) {
   {
@@ -85,7 +77,7 @@ std::vector<udp::endpoint> parse_ipv4_peer_endpoints(AnnounceResponse* response,
   return endpoints;
 }
 
-boost::asio::awaitable<void> timeout(time_point& deadline)
+boost::asio::awaitable<void> timeout(const time_point& deadline)
 {
   steady_timer timer(co_await this_coro::executor);
   auto now = std::chrono::steady_clock::now();
@@ -100,13 +92,10 @@ boost::asio::awaitable<void> timeout(time_point& deadline)
 boost::asio::awaitable<void> async_receive_from(udp::socket& socket,
                                                 std::vector<uint8_t>& buffer,
                                                 udp::endpoint& sender,
-                                                size_t& bytes_recieved)
+                                                size_t& bytes_received)
 {
-#pragma warning(push)
-#pragma warning(disable : 26811)
-  bytes_recieved =
+  bytes_received =
       co_await socket.async_receive_from(boost::asio::buffer(buffer), sender);
-#pragma warning(pop)
 }
 
 boost::asio::awaitable<size_t> async_receive_from_with_timeout(
@@ -115,11 +104,21 @@ boost::asio::awaitable<size_t> async_receive_from_with_timeout(
     udp::endpoint& sender,
     time_point deadline)
 {
-  size_t bytes_recieved = 0;
-  co_await (async_receive_from(socket, buffer, sender, bytes_recieved)
+  size_t bytes_received = 0;
+  co_await (async_receive_from(socket, buffer, sender, bytes_received)
             || timeout(deadline));
 
-  co_return bytes_recieved;
+  co_return bytes_received;
+}
+}  // namespace
+
+Tracker::Tracker(std::shared_ptr<InternalContext> context,
+                 address address,
+                 port_type port)
+    : m_context {std::move(context)}
+    , m_address {std::move(address)}
+    , m_port {port}
+{
 }
 
 boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
@@ -157,7 +156,7 @@ boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
 
   auto connection_id = (*handshake_response)->connection_id;
 
-  std::fill(buffer.begin(), buffer.end(), 0);
+  std::ranges::fill(buffer.begin(), buffer.end(), 0);
 
   AnnounceRequest peers_request {*m_context, connection_id};
 
@@ -174,7 +173,7 @@ boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
     co_return;
   }
 
-  for (auto ip : parse_ipv4_peer_endpoints(*response, buffer.size())) {
+  for (const auto& ip : parse_ipv4_peer_endpoints(*response, buffer.size())) {
     out_peer_endpoints.emplace_back(ip);
   }
 

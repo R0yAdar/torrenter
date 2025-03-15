@@ -1,5 +1,4 @@
 #include <concepts>
-#include <iostream>
 #include <typeinfo>
 
 #include "client/peer.hpp"
@@ -56,7 +55,7 @@ void mark_bitfield(uint32_t index, PeerStatus& status)
 
 Peer::Peer(std::shared_ptr<const InternalContext> context,
            PeerContactInfo peer_info,
-           boost::asio::any_io_executor& io,
+           const boost::asio::any_io_executor& io,
            size_t max_outgoing_messages)
     : m_application_context {std::move(context)}
     , m_context {std::make_shared<ExternalPeerContext>(peer_info)}
@@ -83,8 +82,6 @@ awaitable<void> Peer::start_async()
 
     co_await connect_async();
     co_await (receive_loop_async() && send_loop_async());
-
-    std::cout << m_context->peer_id << " Exited\n";
 
     m_activity.is_active = false;
   }
@@ -140,8 +137,6 @@ awaitable<void> Peer::receive_loop_async()
   while (!m_is_stopping) {
     try {
       if (auto message = co_await read_message(m_socket)) {
-        // std::cout << m_context->peer_id << " RType" << message->index() <<
-        // '\n';
 
         handle_message(*message);
 
@@ -175,8 +170,6 @@ awaitable<void> Peer::send_loop_async()
     try {
       auto message =
           co_await m_send_queue.async_receive(boost::asio::use_awaitable);
-
-      // std::cout << m_context->peer_id << " SType" << message.index() << '\n';
 
       if (m_is_stopping) {
         break;

@@ -1,12 +1,15 @@
 #include <algorithm>
 
 #include "torrentfile.hpp"
+
 #include <openssl/sha.h>
 
 using bencode::Dict;
 using bencode::List;
 
 namespace btr
+{
+namespace
 {
 template<typename T, BeValueTypeIndex Index>
 std::expected<T, TorrentFileParseError> parse_field(
@@ -69,28 +72,27 @@ std::expected<std::vector<std::string>, TorrentFileParseError> parse_announcers(
 
   return std::unexpected {TorrentFileParseError::InvalidField};
 }
-
-std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file)
+}  // namespace
+std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(
+    BeValue file)
 {
-  TorrentFile torrent{};
+  TorrentFile torrent {};
 
-  // Ensure the top-level structure is a dictionary
   if (file.which() != static_cast<int8_t>(BeValueTypeIndex::IDict)) {
     return std::unexpected {TorrentFileParseError::InvalidField};
   }
-  const auto& toplevel = boost::get<Dict>(file);
+  const auto& top_level = boost::get<Dict>(file);
 
-  // Parse "announce" (required)
-  auto announce_result = parse_string_field(toplevel, "announce");
+  auto announce_result = parse_string_field(top_level, "announce");
   if (!announce_result) {
     return std::unexpected {announce_result.error()};
   }
   torrent.trackers.push_back(std::move(*announce_result));
 
-  // Parse "announce-list" (optional)
-  if (toplevel.contains("announce-list")) {
-    auto announce_list_result = parse_list_field(toplevel, "announce-list");
-    if (announce_list_result) {
+  if (top_level.contains("announce-list")) {
+    if (auto announce_list_result =
+            parse_list_field(top_level, "announce-list"))
+    {
       for (const auto& sublist : *announce_list_result) {
         if (sublist.which() != BeValueTypeIndex::IList) {
           return std::unexpected {TorrentFileParseError::InvalidField};
@@ -106,8 +108,7 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
     }
   }
 
-  // Parse "info" (required)
-  auto info_result = parse_dict_field(toplevel, "info");
+  auto info_result = parse_dict_field(top_level, "info");
   if (!info_result) {
     return std::unexpected {info_result.error()};
   }
@@ -119,38 +120,35 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
        encoded_info.length(),
        torrent.info_hash.data());
 
-  // Parse "name" (required)
   auto name_result = parse_string_field(info, "name");
   if (!name_result) {
     return std::unexpected {TorrentFileParseError::MissingField};
   }
   torrent.metadata.directory_name = std::move(*name_result);
 
-  // Parse "piece length" (required)
   auto piece_length_result = parse_int_field(info, "piece length");
   if (!piece_length_result) {
     return std::unexpected {TorrentFileParseError::MissingField};
   }
   torrent.piece_length = *piece_length_result;
 
-  // Parse "pieces" (required)
   auto pieces_result = parse_string_field(info, "pieces");
   if (!pieces_result) {
     return std::unexpected {TorrentFileParseError::MissingField};
   }
-  const std::string& pieces_str = *pieces_result;
 
-  // Split "pieces" into 20-byte hashes
-  for (size_t i = 0; i < pieces_str.size(); i += 20) {
-    if (i + 20 > pieces_str.size()) {
+  const std::string& pieces_str = *pieces_result;
+  constexpr auto SHA1_HASH_SIZE = 20;
+
+  for (size_t i = 0; i < pieces_str.size(); i += SHA1_HASH_SIZE) {
+    if (i + SHA1_HASH_SIZE > pieces_str.size()) {
       return std::unexpected {TorrentFileParseError::InvalidField};
     }
     std::vector<uint8_t> hash(pieces_str.data() + i,
-                              pieces_str.data() + i + 20);
+                              pieces_str.data() + i + SHA1_HASH_SIZE);
     torrent.piece_hashes.push_back(std::move(hash));
   }
 
-  // Parse "files" (multi-file torrents) or "length" (single-file torrents)
   if (info.contains("files")) {
     auto files_result = parse_list_field(info, "files");
     if (!files_result) {
@@ -167,7 +165,6 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
       auto path_result = parse_list_field(file_dict, "path");
       if (!length_result || !path_result) {
         return std::unexpected {TorrentFileParseError::InvalidField};
-        return std::unexpected {TorrentFileParseError::InvalidField};
       }
 
       std::string full_path;
@@ -178,8 +175,8 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
         full_path += "/" + boost::get<std::string>(path_part);
       }
 
-      torrent.files.push_back(
-          FileItem(std::move(full_path), *length_result, offset));
+      torrent.files.emplace_back(std::move(full_path), *length_result, offset);
+
       offset += *length_result;
       torrent.file_length += *length_result;
     }
@@ -189,40 +186,35 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
       return std::unexpected {TorrentFileParseError::MissingField};
     }
     torrent.file_length = *length_result;
-    torrent.files.push_back(
-        FileItem(torrent.metadata.directory_name, *length_result, 0));
+    torrent.files.emplace_back(
+        torrent.metadata.directory_name, *length_result, 0);
   } else {
     return std::unexpected {TorrentFileParseError::MissingField};
   }
 
-  // Parse optional metadata fields
-  if (toplevel.contains("comment")) {
-    auto comment_result = parse_string_field(toplevel, "comment");
-    if (comment_result) {
+  if (top_level.contains("comment")) {
+    if (auto comment_result = parse_string_field(top_level, "comment")) {
       torrent.metadata.comment = std::move(*comment_result);
     }
   }
-  if (toplevel.contains("created by")) {
-    auto created_by_result = parse_string_field(toplevel, "created by");
-    if (created_by_result) {
+  if (top_level.contains("created by")) {
+    if (auto created_by_result = parse_string_field(top_level, "created by")) {
       torrent.metadata.created_by = std::move(*created_by_result);
     }
   }
-  if (toplevel.contains("creation date")) {
-    auto creation_date_result = parse_int_field(toplevel, "creation date");
-    if (creation_date_result) {
+  if (top_level.contains("creation date")) {
+    if (auto creation_date_result = parse_int_field(top_level, "creation date"))
+    {
       torrent.metadata.creation_date =
           std::chrono::seconds(*creation_date_result);
     }
   }
-  if (toplevel.contains("encoding")) {
-    auto encoding_result = parse_string_field(toplevel, "encoding");
-    if (encoding_result) {
+  if (top_level.contains("encoding")) {
+    if (auto encoding_result = parse_string_field(top_level, "encoding")) {
       torrent.metadata.encoding_type = std::move(*encoding_result);
     }
   }
 
-  // Return the fully populated TorrentFile
   return torrent;
 }
 

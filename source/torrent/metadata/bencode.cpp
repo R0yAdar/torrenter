@@ -14,7 +14,7 @@ constexpr char INT_PREFIX = 'i';
 constexpr char LIST_PREFIX = 'l';
 constexpr char DICT_PREFIX = 'd';
 constexpr char SUFFIX = 'e';
-constexpr char STRING_LENGTH_DELIMETER = ':';
+constexpr char STRING_LENGTH_DELIMITER = ':';
 constexpr int MINIMUM_BEVALUE_ENCODED_SIZE = 2;
 
 std::string BEncoder::operator()(BeValue value) const
@@ -29,7 +29,7 @@ std::string BEncoder::operator()(std::int64_t value) const
 
 std::string BEncoder::operator()(std::string value) const
 {
-  return std::to_string(value.length()) + STRING_LENGTH_DELIMETER + value;
+  return std::to_string(value.length()) + STRING_LENGTH_DELIMITER + value;
 }
 
 std::string BEncoder::operator()(const List& values) const
@@ -88,7 +88,7 @@ DecodeResult BDecoder::decode_int(std::string_view value) const
 
 DecodeResult BDecoder::decode_string(std::string_view value) const
 {
-  auto delimitIndex = value.find_first_of(STRING_LENGTH_DELIMETER);
+  auto delimitIndex = value.find_first_of(STRING_LENGTH_DELIMITER);
 
   if (delimitIndex == std::string::npos) {
     throw std::invalid_argument("Corrupted string encoding: no delimiter");

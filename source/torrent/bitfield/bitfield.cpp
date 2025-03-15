@@ -4,12 +4,6 @@
 
 namespace aux
 {
-
-BitField::BitField()
-    : m_bitfield {}
-{
-}
-
 BitField::BitField(size_t piece_count)
     : m_bitfield(piece_count)
 {

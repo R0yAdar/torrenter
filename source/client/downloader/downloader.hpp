@@ -49,7 +49,7 @@ public:
 
   boost::asio::awaitable<std::optional<FilePiece>> retrieve_piece(size_t index);
 
-  boost::asio::awaitable<void> restart_connection();
+  boost::asio::awaitable<void> restart_connection() const;
 
 private:
   boost::asio::awaitable<void> triggered_on_received_message(
