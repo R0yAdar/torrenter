@@ -5,7 +5,6 @@
 #include <map>
 #include <set>
 
-#include "auxiliary/random.hpp"
 #include "client/downloader/downloader.hpp"
 #include "client/peer.hpp"
 #include "client/storage/storage.hpp"
@@ -61,7 +60,6 @@ public:
     for (const auto& contact : potential_peers) {
       if (!m_active_connections.contains(contact)) {
         m_active_connections.insert(contact);
-        std::cout << "New peer: " << contact.address << "\n";
         auto peer = std::make_shared<Peer>(m_app_context, contact, io);
         auto downloader = std::make_shared<Downloader>(m_app_context, peer);
 
@@ -81,7 +79,7 @@ public:
 
     for (size_t i = 0; i < 2; i++) {
       for (auto piece_index : m_missing_pieces) {
-        if (m_piece_downloaders[piece_index].size() == 0) {
+        if (m_piece_downloaders[piece_index].size() < 8) {
           for (auto& [downloader, assigned_pieces] : m_peer_pool) {
             if (downloader->get_context().status.remote_bitfield.get(
                     piece_index)
@@ -145,6 +143,11 @@ public:
               completed_indexes.push_back(index);
 
               m_missing_pieces.erase(index);
+              break;
+
+            case PieceStatus::Corrupt:
+              std::cout << "Redownloading corrupt\n";
+              co_await downloader->download_piece(index);
               break;
 
             default:

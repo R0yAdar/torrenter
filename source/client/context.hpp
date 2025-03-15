@@ -8,12 +8,14 @@
 namespace btr
 {
 using InfoHash = std::vector<uint8_t>;
+using PieceHash = std::vector<uint8_t>;
 
 enum class PieceStatus : uint8_t
 {
   Pending,
   Active,
-  Complete
+  Complete,
+  Corrupt
 };
 
 struct FilePiece
@@ -33,6 +35,7 @@ public:
   uint64_t file_size;
   uint32_t piece_size;
   uint32_t piece_count;
+  std::vector<PieceHash> piece_hashes;
 
   PeerId id() const
   {

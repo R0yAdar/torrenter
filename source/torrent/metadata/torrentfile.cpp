@@ -1,6 +1,4 @@
 #include <algorithm>
-#include <iostream>
-#include <string_view>
 
 #include "torrentfile.hpp"
 #include <openssl/sha.h>
@@ -149,7 +147,7 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
     }
     std::vector<uint8_t> hash(pieces_str.data() + i,
                               pieces_str.data() + i + 20);
-    torrent.piece_hashes.push_back(PieceHash(std::move(hash)));
+    torrent.piece_hashes.push_back(std::move(hash));
   }
 
   // Parse "files" (multi-file torrents) or "length" (single-file torrents)
@@ -168,6 +166,7 @@ std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(BeValue file
       auto length_result = parse_int_field(file_dict, "length");
       auto path_result = parse_list_field(file_dict, "path");
       if (!length_result || !path_result) {
+        return std::unexpected {TorrentFileParseError::InvalidField};
         return std::unexpected {TorrentFileParseError::InvalidField};
       }
 

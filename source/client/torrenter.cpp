@@ -16,15 +16,11 @@
 namespace btr
 {
 Torrenter::Torrenter(TorrentFile torrent)
-    : m_torrent {torrent}
+    : m_torrent {std::move(torrent)}
 {
 }
 
-// Download file is async and not multi-threaded
-// Because multi-threading is obsolete for an io bound task like this
-// And Boost-Asio provides a wonderful interface for high-performance
-// async services.
-void Torrenter::download_file(std::filesystem::path at)
+void Torrenter::download_file(std::filesystem::path at, std::shared_ptr<IStorage> storage_device)
 {
   std::regex rgx(R"(udp://([a-zA-Z0-9.-]+):([0-9]+)/announce)");
 
@@ -59,12 +55,13 @@ void Torrenter::download_file(std::filesystem::path at)
 
   std::vector<PeerContactInfo> peers;
 
-  io_context connect_io {};
+  io_context io {};
 
   auto context = std::make_shared<InternalContext>();
 
   context->info_hash = std::vector(m_torrent.info_hash.cbegin(),
                                             m_torrent.info_hash.cend());
+  context->piece_hashes = m_torrent.piece_hashes;
   context->file_size = m_torrent.file_length;
   context->piece_size = m_torrent.piece_length;
   context->piece_count = m_torrent.piece_hashes.size();
@@ -77,20 +74,12 @@ void Torrenter::download_file(std::filesystem::path at)
     trackers.emplace_back(context, endpoint.address(), endpoint.port());
   }
 
-  Reactor reactor {context};
+  Reactor reactor {context, std::move(storage_device)};
 
-  boost::asio::co_spawn(connect_io,
+  boost::asio::co_spawn(io,
                         reactor.download(at.generic_string(), trackers),
                         boost::asio::detached);
 
-  connect_io.run();
-
-  // bitfield and assignment
-
-  // task managing, downloading pieces (& validating)
-
-  // THE END (game)
-
-  // Final end
+  io.run();
 }
 }  // namespace btr

@@ -1,7 +1,9 @@
-#include <variant>
 #include <iostream>
+#include <variant>
 
 #include "downloader.hpp"
+
+#include <openssl/sha.h>
 
 #include "auxiliary/variant_aux.hpp"
 
@@ -30,12 +32,10 @@ const PeerActivity& Downloader::get_activity() const
   return m_peer->get_activity();
 }
 
-
 boost::asio::awaitable<bool> Downloader::download_piece(uint32_t index)
 {
   std::cout << "Downloader - " << m_peer->get_context().contact_info.address
-            << ": " << index << "(piece)"
-            << std::endl;
+            << ": " << index << "(piece)" << std::endl;
   if (!m_peer->get_context().status.remote_bitfield.get(index)) {
     co_return false;
   }
@@ -163,7 +163,17 @@ boost::asio::awaitable<std::optional<FilePiece>> Downloader::retrieve_piece(
   }
 
   if (m_pieces[index].status == PieceStatus::Complete) {
-    co_return m_pieces.extract(m_pieces.find(index)).mapped();
+    auto piece = m_pieces.extract(m_pieces.find(index)).mapped();
+
+    std::vector<uint8_t> hash(SHA_DIGEST_LENGTH);
+
+    SHA1(piece.data.data(), piece.data.size(), hash.data());
+
+    if (hash != m_application_context->piece_hashes[index]) {
+      piece.status = PieceStatus::Corrupt;
+    }
+
+    co_return piece;
   }
 
   co_return FilePiece {.index = index,
@@ -175,6 +185,5 @@ boost::asio::awaitable<void> Downloader::restart_connection()
 {
   return m_peer->start_async();
 }
-
 
 }  // namespace btr

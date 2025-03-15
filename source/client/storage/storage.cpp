@@ -22,6 +22,10 @@ boost::asio::awaitable<void> FileDirectoryStorage::push_piece(
 
   path /= (std::to_string(index) + SUFFIX);
 
+  if (std::filesystem::exists(path)) {
+    co_return;
+  }
+
   boost::asio::stream_file file {co_await boost::asio::this_coro::executor,
                                  path.string(),
                                  boost::asio::stream_file::flags::write_only

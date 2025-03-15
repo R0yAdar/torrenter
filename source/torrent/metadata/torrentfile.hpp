@@ -28,16 +28,6 @@ struct FileItem
   uint64_t offset;
 };
 
-struct PieceHash
-{
-  PieceHash(std::vector<uint8_t> p_hash)
-      : hash {p_hash}
-  {
-  }
-
-  std::vector<uint8_t> hash;
-};
-
 struct TorrentFileMetadata
 {
   std::string directory_name;
@@ -55,7 +45,7 @@ struct TorrentFile
   std::array<uint8_t, 20> info_hash;
   std::vector<FileItem> files;
   std::vector<std::string> trackers;
-  std::vector<PieceHash> piece_hashes;
+  std::vector<std::vector<uint8_t>> piece_hashes;
 
   int64_t file_length;
   int64_t piece_length;

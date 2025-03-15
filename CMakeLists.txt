@@ -27,10 +27,12 @@ add_library(
     "source/torrent/messages.hpp" 
     "source/client/reactor/reactor.hpp"
     "source/client/reactor/reactor.cpp"
-    "source/client/downloader/downloader.hpp"
-    "source/client/downloader/downloader.cpp"
+    
     "source/client/storage/storage.cpp"
     "source/client/storage/storage.hpp"
+
+    "source/client/downloader/downloader.hpp"
+    "source/client/downloader/downloader.cpp"
     
     "source/client/transmit/transmit.hpp"
     "source/client/transmit/transmit.cpp"
@@ -71,6 +73,7 @@ set_property(TARGET torrenter_exe PROPERTY OUTPUT_NAME torrenter)
 
 target_compile_features(torrenter_exe PRIVATE cxx_std_23)
 
+target_link_libraries(torrenter_exe PRIVATE Boost::headers)
 target_link_libraries(torrenter_exe PRIVATE torrenter_lib)
 
 # ---- Install rules ----

@@ -13,7 +13,7 @@ find_package(Boost REQUIRED COMPONENTS headers)
 
 # ---- Tests ----
 
-add_executable(torrenter_test source/bitTorrent/bencode_test.cpp source/utp/packet_test.cpp "source/bitTorrent/protocol_test.cpp")
+add_executable(torrenter_test "source/bitTorrent/bencode_test.cpp" "source/bitTorrent/protocol_test.cpp")
 
 # Important to have that before any link to boost or a program that uses boost:
 target_link_libraries(torrenter_test PRIVATE Catch2::Catch2WithMain) 

@@ -22,10 +22,10 @@ class Reactor
   std::unique_ptr<IStrategy> m_strategy;
 
 public:
-  Reactor(std::shared_ptr<InternalContext> context)
-      : m_context {context}
-      , m_storage_device {std::make_shared<FileDirectoryStorage>(
-            std::filesystem::path {"C:\\torrents"})}
+  Reactor(std::shared_ptr<InternalContext> context,
+          std::shared_ptr<IStorage> storage_device)
+      : m_context {std::move(context)}
+      , m_storage_device {std::move(storage_device)}
   {
     m_strategy =
         std::make_unique<RandomPieceStrategy>(m_context, m_storage_device);
@@ -50,7 +50,7 @@ public:
             }
 
             boost::asio::steady_timer timer(io);
-            timer.expires_from_now(5s);
+            timer.expires_from_now(8s);
 
             co_await timer.async_wait(boost::asio::use_awaitable);
 
@@ -115,10 +115,9 @@ public:
       while (m_storage_device->exists(info_hash, index)) {
         auto piece_size = m_context->get_piece_size(index);
         std::cout << "Merging " << index << std::endl;
-        auto path = std::filesystem::path("C:\\torrents") / info_hash
-            / (std::to_string(index) + ".tp");
 
-        co_await m_storage_device->pull_piece(info_hash, index, 0, piece_size, buffer);
+        co_await m_storage_device->pull_piece(
+            info_hash, index, 0, piece_size, buffer);
 
         co_await boost::asio::async_write(
             ofile,

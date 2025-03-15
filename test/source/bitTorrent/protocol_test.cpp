@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 
-#include "bitTorrent/messages.hpp"
+#include "torrent/messages.hpp"
 
 TEST_CASE("Handshake", "[library]")
 {

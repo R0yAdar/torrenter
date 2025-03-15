@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <print>
 #include <regex>
 
 #include "app.hpp"
@@ -9,38 +8,42 @@
 #include <boost/asio.hpp>
 #include <boost/version.hpp>
 #include <fmt/color.h>
+#include <openssl/opensslv.h>
 
-#include "client/peer.hpp"
 #include "torrent/metadata/bencode.hpp"
 #include "torrent/metadata/torrentfile.hpp"
 #include "client/tracker/tracker.hpp"
 
 using namespace boost;
 
-App::App()
-    : name {fmt::format("{}", "torrenter")}
+App::App(std::filesystem::path piece_vault_root)
+    : m_piece_vault {std::make_shared<FileDirectoryStorage>(piece_vault_root)}
 {
   fmt::print(fg(fmt::color::aqua) | fmt::emphasis::bold | fmt::emphasis::italic,
              "Welcome to torrenter!\n");
+
   fmt::print(fg(fmt::color::antique_white) | fmt::emphasis::bold
                  | fmt::emphasis::italic,
              "Built with:\n");
   fmt::print(fg(fmt::color::orange) | fmt::emphasis::italic,
              " *Boost Version: {}\n",
              BOOST_LIB_VERSION);
+
   fmt::print(fg(fmt::color::rebecca_purple) | fmt::emphasis::italic,
              " *FMT Version: {}\n",
              FMT_VERSION);
+
+  fmt::print(fg(fmt::color::medium_violet_red) | fmt::emphasis::italic,
+             " *OPENSSL Version: {}\n",
+             OPENSSL_VERSION_STR);
 }
 
-void App::Run()
+void App::Run(const std::string& torrent_file_path,
+              const std::string& download_path)
 {
   fmt::print(fg(fmt::color::antique_white) | fmt::emphasis::bold
                  | fmt::emphasis::italic,
              "\nStarted running...\n");
-
-  std::string torrent_file_path =
-      "C:\\Users\\royad\\Downloads\\lotus.torrent";
 
   auto file = std::ifstream {torrent_file_path, std::ios::binary};
 
@@ -56,7 +59,7 @@ void App::Run()
     btr::Torrenter torrenter {*torrent};
 
     try {
-      torrenter.download_file("C:\\Users\\royad\\Downloads\\slotus.mp4");
+      torrenter.download_file(download_path, m_piece_vault);
     } catch (std::exception& e) {
       std::cout << e.what() << std::endl;
     }
