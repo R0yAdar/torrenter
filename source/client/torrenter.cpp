@@ -17,7 +17,6 @@ namespace btr
 {
 Torrenter::Torrenter(TorrentFile torrent)
     : m_torrent {torrent}
-    , m_peer_id {}
 {
 }
 
@@ -27,7 +26,6 @@ Torrenter::Torrenter(TorrentFile torrent)
 // async services.
 void Torrenter::download_file(std::filesystem::path at)
 {
-  // resolve trackers
   std::regex rgx(R"(udp://([a-zA-Z0-9.-]+):([0-9]+)/announce)");
 
   std::vector<boost::asio::ip::udp::endpoint> endpoints {};
@@ -36,8 +34,6 @@ void Torrenter::download_file(std::filesystem::path at)
   io_context resolve_io {};
 
   for (auto tracker : m_torrent.trackers) {
-    std::println("{}", tracker);
-
     if (std::regex_search(tracker, match, rgx)) {
       std::string address = match[1];
       int16_t port = static_cast<int16_t>(std::stoi(match[2]));
@@ -60,9 +56,6 @@ void Torrenter::download_file(std::filesystem::path at)
 
   resolve_io.run();
 
-  std::println("Finished resolving");
-
-  // init context
 
   std::vector<PeerContactInfo> peers;
 
@@ -70,7 +63,6 @@ void Torrenter::download_file(std::filesystem::path at)
 
   auto context = std::make_shared<InternalContext>();
 
-  context->client_id = m_peer_id;
   context->info_hash = std::vector(m_torrent.info_hash.cbegin(),
                                             m_torrent.info_hash.cend());
   context->file_size = m_torrent.file_length;
@@ -79,44 +71,16 @@ void Torrenter::download_file(std::filesystem::path at)
 
   std::cout << "FileSize: " << context->file_size << std::endl;
 
-  // fetch peers
-
-  io_context swarm_io {};
-
-  std::vector<udp::endpoint> swarm;
-
   std::vector<Tracker> trackers;
 
   for (auto& endpoint : endpoints) {
     trackers.emplace_back(context, endpoint.address(), endpoint.port());
   }
 
-  for (auto& tracker : trackers) {
-    boost::asio::co_spawn(swarm_io,
-                          tracker.fetch_udp_swarm(swarm_io, swarm),
-                          boost::asio::detached);
-  }
-
-  std::println("Starting to fetch swarm");
-  swarm_io.run();
-  std::println("Finished fetching swarm");
-
-  // connect to peers
-
-  std::set<boost::asio::ip::udp::endpoint> unique_endpoints;
-
-  for (auto& peer : swarm) {
-    unique_endpoints.insert(peer);
-  }
-    
   Reactor reactor {context};
 
-  for (auto& endpoint : unique_endpoints) {
-    peers.push_back(PeerContactInfo {endpoint.address(), endpoint.port()});
-  }
-
   boost::asio::co_spawn(connect_io,
-                        reactor.download(at.generic_string(), peers),
+                        reactor.download(at.generic_string(), trackers),
                         boost::asio::detached);
 
   connect_io.run();

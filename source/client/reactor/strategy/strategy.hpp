@@ -1,4 +1,7 @@
+#pragma once
+
 #include <algorithm>
+#include <iostream>
 #include <map>
 #include <set>
 
@@ -21,6 +24,8 @@ public:
   virtual boost::asio::awaitable<void> revoke() = 0;
 
   virtual boost::asio::awaitable<bool> is_done() = 0;
+
+  virtual ~IStrategy() = default;
 };
 
 class RandomPieceStrategy : public IStrategy
@@ -28,6 +33,8 @@ class RandomPieceStrategy : public IStrategy
   std::map<uint32_t, std::vector<std::shared_ptr<Downloader>>>
       m_piece_downloaders;
   std::map<std::shared_ptr<Downloader>, std::vector<uint32_t>> m_peer_pool;
+
+  std::set<PeerContactInfo> m_active_connections;
   std::set<uint32_t> m_missing_pieces;
 
   std::shared_ptr<IStorage> m_storage_device;
@@ -51,13 +58,17 @@ public:
   {
     auto io = co_await boost::asio::this_coro::executor;
 
-    for (auto contact : potential_peers) {
-      auto peer = std::make_shared<Peer>(m_app_context, contact, io);
-      auto downloader = std::make_shared<Downloader>(m_app_context, peer);
+    for (const auto& contact : potential_peers) {
+      if (!m_active_connections.contains(contact)) {
+        m_active_connections.insert(contact);
+        std::cout << "New peer: " << contact.address << "\n";
+        auto peer = std::make_shared<Peer>(m_app_context, contact, io);
+        auto downloader = std::make_shared<Downloader>(m_app_context, peer);
 
-      m_peer_pool[downloader] = {};
+        m_peer_pool[downloader] = {};
 
-      boost::asio::co_spawn(io, peer->start_async(), boost::asio::detached);
+        boost::asio::co_spawn(io, peer->start_async(), boost::asio::detached);
+      }
     }
   }
 
@@ -70,7 +81,7 @@ public:
 
     for (size_t i = 0; i < 2; i++) {
       for (auto piece_index : m_missing_pieces) {
-        if (m_piece_downloaders[piece_index].size() <= 1) {
+        if (m_piece_downloaders[piece_index].size() == 0) {
           for (auto& [downloader, assigned_pieces] : m_peer_pool) {
             if (downloader->get_context().status.remote_bitfield.get(
                     piece_index)
@@ -107,8 +118,9 @@ public:
       }
     }
 
-    for (auto downloader : downloaders_to_remove) {
+    for (auto& downloader : downloaders_to_remove) {
       m_peer_pool.erase(downloader);
+      m_active_connections.erase(downloader->get_context().contact_info);
     }
 
     co_return;

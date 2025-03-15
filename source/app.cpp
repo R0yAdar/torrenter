@@ -40,7 +40,7 @@ void App::Run()
              "\nStarted running...\n");
 
   std::string torrent_file_path =
-      "C:\\Users\\royad\\Downloads\\dune.torrent";
+      "C:\\Users\\royad\\Downloads\\lotus.torrent";
 
   auto file = std::ifstream {torrent_file_path, std::ios::binary};
 
@@ -56,7 +56,7 @@ void App::Run()
     btr::Torrenter torrenter {*torrent};
 
     try {
-      torrenter.download_file("C:\\Users\\royad\\Downloads\\duney.mp4");
+      torrenter.download_file("C:\\Users\\royad\\Downloads\\slotus.mp4");
     } catch (std::exception& e) {
       std::cout << e.what() << std::endl;
     }

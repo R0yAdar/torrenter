@@ -3,6 +3,7 @@
 #include <chrono>
 #include "auxiliary/peer_id.hpp"
 #include "torrent/bitfield/bitfield.hpp"
+#include <boost/asio.hpp>
 
 namespace btr
 {
@@ -25,12 +26,18 @@ struct FilePiece
 
 class InternalContext
 {
+  PeerId client_id{};
+
 public:
-  PeerId client_id;
   InfoHash info_hash;
   uint64_t file_size;
   uint32_t piece_size;
   uint32_t piece_count;
+
+  PeerId id() const
+  {
+    return client_id;
+  }
 
   std::string info_hash_as_string() const
   {
@@ -67,14 +74,29 @@ struct PeerStatus
   bool connection_down;
 };
 
+struct PeerContactInfo
+{
+  boost::asio::ip::address address;
+  boost::asio::ip::port_type port;
+
+  bool operator==(const PeerContactInfo& o) const
+  {
+    return address == o.address && port == o.port;
+  }
+
+  bool operator<(const PeerContactInfo& o) const { return address < o.address; }
+};
+
 struct ExternalPeerContext
 {
-  ExternalPeerContext()
+  ExternalPeerContext(PeerContactInfo contact_info)
       : status {}
+      , contact_info {std::move(contact_info)}
   {
   }
   std::string peer_id;
   PeerStatus status;
+  PeerContactInfo contact_info;
 };
 
 }  // namespace btr

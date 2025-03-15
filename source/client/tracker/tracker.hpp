@@ -28,8 +28,8 @@ public:
           port_type port);
 
   boost::asio::awaitable<void> fetch_udp_swarm(
-      io_context& io,
+      boost::asio::any_io_executor& io,
       std::vector<udp::endpoint>& endpoints,
-      std::chrono::seconds timeout = 1s);
+      std::chrono::seconds timeout = 1s) const;
 };
 }  // namespace btr

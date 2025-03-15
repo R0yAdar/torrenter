@@ -1,5 +1,5 @@
-#include <ranges>
 #include <variant>
+#include <iostream>
 
 #include "downloader.hpp"
 
@@ -33,6 +33,9 @@ const PeerActivity& Downloader::get_activity() const
 
 boost::asio::awaitable<bool> Downloader::download_piece(uint32_t index)
 {
+  std::cout << "Downloader - " << m_peer->get_context().contact_info.address
+            << ": " << index << "(piece)"
+            << std::endl;
   if (!m_peer->get_context().status.remote_bitfield.get(index)) {
     co_return false;
   }

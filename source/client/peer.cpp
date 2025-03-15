@@ -58,9 +58,8 @@ Peer::Peer(std::shared_ptr<const InternalContext> context,
            PeerContactInfo peer_info,
            boost::asio::any_io_executor& io,
            size_t max_outgoing_messages)
-    : m_contact_info {std::move(peer_info)}
-    , m_application_context {std::move(context)}
-    , m_context {std::make_shared<ExternalPeerContext>()}
+    : m_application_context {std::move(context)}
+    , m_context {std::make_shared<ExternalPeerContext>(peer_info)}
     , m_send_queue {io, max_outgoing_messages}
     , m_socket {io}
 {
@@ -84,16 +83,17 @@ awaitable<void> Peer::start_async()
 
     co_await connect_async();
     co_await (receive_loop_async() && send_loop_async());
+
+    std::cout << m_context->peer_id << " Exited\n";
+
+    m_activity.is_active = false;
   }
-
-  std::cout << m_context->peer_id << " Exited\n";
-
-  m_activity.is_active = false;
 }
 
 awaitable<void> Peer::connect_async()
 {
-  co_await m_socket.async_connect(tcp::endpoint(m_contact_info.address, m_contact_info.port),
+  co_await m_socket.async_connect(tcp::endpoint(m_context->contact_info.address,
+                                                m_context->contact_info.port),
                                   boost::asio::use_awaitable);
   {
     btr::Handshake handshake {*m_application_context};
@@ -140,8 +140,8 @@ awaitable<void> Peer::receive_loop_async()
   while (!m_is_stopping) {
     try {
       if (auto message = co_await read_message(m_socket)) {
-
-        //std::cout << m_context->peer_id << " RType" << message->index() << '\n';
+        // std::cout << m_context->peer_id << " RType" << message->index() <<
+        // '\n';
 
         handle_message(*message);
 

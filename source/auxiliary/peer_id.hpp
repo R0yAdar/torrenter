@@ -27,7 +27,7 @@ public:
     std::generate(m_peer_id.begin() + 8, m_peer_id.end(), rbe);
   }
 
-  const std::array<uint8_t, 20>& get_id() const { return m_peer_id; }
+  const std::array<uint8_t, 20>& as_raw() const { return m_peer_id; }
 
 private:
   std::array<uint8_t, 20> m_peer_id;

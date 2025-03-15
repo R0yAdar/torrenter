@@ -51,8 +51,9 @@ struct PACKED_ATTRIBUTE Handshake
 {
   Handshake(const InternalContext& context)
   {
-    std::copy(context.client_id.get_id().cbegin(),
-              context.client_id.get_id().cend(),
+    auto id = context.id();
+    std::copy(id.as_raw().cbegin(),
+              id.as_raw().cend(),
               peer_id);
 
     std::copy(context.info_hash.cbegin(), context.info_hash.cend(), infohash);
@@ -102,13 +103,6 @@ public:
   uint32_big piece_index;
   uint32_big offset_within_piece;
   uint32_big length;
-  /*
-  auto operator<=>(const Request& o) const
-  {
-    return std::tie(piece_index, offset_within_piece, length)
-        <=> std::tie(o.piece_index, o.offset_within_piece, o.length);
-  };
-  */
 };
 
 struct PACKED_ATTRIBUTE Cancel

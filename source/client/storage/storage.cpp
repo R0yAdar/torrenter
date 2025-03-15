@@ -34,11 +34,12 @@ boost::asio::awaitable<bool> FileDirectoryStorage::pull_piece(
     std::string_view info_hash,
     size_t index,
     size_t offset,
+    size_t amount,
     std::vector<uint8_t>& buffer)
 {
   auto path = m_vault / info_hash / (std::to_string(index) + SUFFIX);
 
-  if (!std::filesystem::exists(path)) {
+  if ((!std::filesystem::exists(path)) || (buffer.size() < amount)) {
     co_return false;
   }
 
@@ -48,7 +49,7 @@ boost::asio::awaitable<bool> FileDirectoryStorage::pull_piece(
       boost::asio::stream_file::flags::read_only};
 
   co_await boost::asio::async_read_at(
-      file, offset, boost::asio::buffer(buffer), boost::asio::use_awaitable);
+      file, offset, boost::asio::buffer(buffer, amount), boost::asio::use_awaitable);
 
   co_return true;
 }

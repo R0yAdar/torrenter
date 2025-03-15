@@ -1,21 +1,24 @@
 #pragma once
 
-#include <string_view>
 #include <filesystem>
+#include <string_view>
 
 #include <boost/asio.hpp>
 
 class IStorage
 {
 public:
-  boost::asio::awaitable<void> virtual push_piece(std::string_view info_hash,
-                                          size_t index,
-                                          const std::vector<uint8_t>& data) = 0;
+  boost::asio::awaitable<void> virtual push_piece(
+      std::string_view info_hash,
+      size_t index,
+      const std::vector<uint8_t>& data) = 0;
 
-  boost::asio::awaitable<bool> virtual pull_piece(std::string_view info_hash,
-                                          size_t index,
-                                          size_t offset,
-                                          std::vector<uint8_t>& buffer) = 0;
+  boost::asio::awaitable<bool> virtual pull_piece(
+      std::string_view info_hash,
+      size_t index,
+      size_t offset,
+      size_t amount,
+      std::vector<uint8_t>& buffer) = 0;
 
   bool virtual exists(std::string_view info_hash, size_t index) = 0;
 };
@@ -38,6 +41,7 @@ public:
       std::string_view info_hash,
       size_t index,
       size_t offset,
+      size_t amount,
       std::vector<uint8_t>& buffer) override final;
 
   bool exists(std::string_view info_hash, size_t index) override final;

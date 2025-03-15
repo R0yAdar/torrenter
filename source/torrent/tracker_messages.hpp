@@ -62,8 +62,10 @@ struct PACKED_ATTRIBUTE AnnounceRequest
     action = static_cast<uint32_t>(Actions::Announce);
     transaction_id = generate_random_in_range<uint32_t, 0, UINT32_MAX>();
 
-    std::copy(context.client_id.get_id().cbegin(),
-              context.client_id.get_id().cend(),
+    auto id = context.id();
+
+    std::copy(id.as_raw().cbegin(),
+              id.as_raw().cend(),
               peer_id);
 
     std::copy(context.info_hash.cbegin(), context.info_hash.cend(), info_hash);

@@ -35,23 +35,8 @@ struct PeerActivity
   std::string sender_exit_message;
 };
 
-struct PeerContactInfo
-{
-  address address;
-  port_type port;
-
-  bool operator==(const PeerContactInfo& o) const
-  {
-    return address == o.address && port == o.port;
-  }
-
-  bool operator<(const PeerContactInfo& o) const { return address < o.address; }
-};
-
 class Peer
 {
-  PeerContactInfo m_contact_info;
-
   std::shared_ptr<const InternalContext> m_application_context;
   std::shared_ptr<ExternalPeerContext> m_context;
 

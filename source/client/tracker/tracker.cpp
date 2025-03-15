@@ -123,10 +123,11 @@ boost::asio::awaitable<size_t> async_receive_from_with_timeout(
 }
 
 boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
-    io_context& io, std::vector<udp::endpoint>& out_peer_endpoints, std::chrono::seconds timeout)
+    boost::asio::any_io_executor& io,
+    std::vector<udp::endpoint>& out_peer_endpoints,
+    std::chrono::seconds timeout) const
 {
-  auto deadline =
-      std::chrono::steady_clock::now() + timeout;
+  auto deadline = std::chrono::steady_clock::now() + timeout;
 
   udp::socket socket(io);
 
