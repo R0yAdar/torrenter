@@ -8,7 +8,7 @@ class Recipe(ConanFile):
         self.folders.generators = "conan"
 
     def requirements(self):
-        self.requires("fmt/11.0.2")
+        self.requires("fmt/11.0.2") 
         self.requires("openssl/3.3.2")
         self.requires("boost/1.86.0")
 

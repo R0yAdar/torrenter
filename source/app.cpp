@@ -1,51 +1,68 @@
-#include "app.hpp"
-#include <openssl/opensslv.h>
-#include <fmt/color.h>
+#include <cstdlib>
+#include <fstream>
 #include <iostream>
-#include <boost/version.hpp>
+#include <regex>
+
+#include "app.hpp"
+
 #include <boost/asio.hpp>
+#include <boost/version.hpp>
+#include <fmt/color.h>
+#include <openssl/opensslv.h>
 
-#include "bitTorrent/bencode.hpp"
+#include "torrent/metadata/bencode.hpp"
+#include "torrent/metadata/torrentfile.hpp"
+#include "client/torrenter.hpp"
 
-using namespace boost;
-
-App::App()
-    : name {fmt::format("{}", "torrenter")}
+App::App(std::filesystem::path piece_vault_root)
+    : m_piece_vault {std::make_shared<FileDirectoryStorage>(std::move(piece_vault_root))}
 {
   fmt::print(fg(fmt::color::aqua) | fmt::emphasis::bold | fmt::emphasis::italic,
              "Welcome to torrenter!\n");
+
   fmt::print(fg(fmt::color::antique_white) | fmt::emphasis::bold
                  | fmt::emphasis::italic,
              "Built with:\n");
-  fmt::print(fg(fmt::color::dark_red) | fmt::emphasis::italic, " *{}\n",
-      OPENSSL_VERSION_TEXT);
-  fmt::print(fg(fmt::color::orange) | fmt::emphasis::italic, 
-      " *Boost Version: {}\n", BOOST_LIB_VERSION);
-  fmt::print(fg(fmt::color::rebecca_purple) | fmt::emphasis::italic, 
-      " *FMT Version: {}\n",
+  fmt::print(fg(fmt::color::orange) | fmt::emphasis::italic,
+             " *Boost Version: {}\n",
+             BOOST_LIB_VERSION);
+
+  fmt::print(fg(fmt::color::rebecca_purple) | fmt::emphasis::italic,
+             " *FMT Version: {}\n",
              FMT_VERSION);
+
+  fmt::print(fg(fmt::color::medium_violet_red) | fmt::emphasis::italic,
+             " *OPENSSL Version: {}\n",
+             OPENSSL_VERSION_STR);
 }
 
-void App::Run()
+void App::run(const std::string& torrent_file_path,
+              const std::string& download_path)
 {
-  fmt::print(fg(fmt::color::antique_white) | fmt::emphasis::bold | fmt::emphasis::italic,
+  fmt::print(fg(fmt::color::antique_white) | fmt::emphasis::bold
+                 | fmt::emphasis::italic,
              "\nStarted running...\n");
 
-  std::string check = "checku";
-  int value = 2834;
-  bencode::BEncoder encoder;
-  bencode::BDecoder decoder;
-  bencode::Dict dict {{"hellp", "brah"}};
-  bencode::List vikk {28, check, dict};
+  auto file = std::ifstream {torrent_file_path, std::ios::binary};
 
-  std::cout << encoder(check) << '\n'
-            << encoder(value) << '\n'
-            << encoder(dict) << '\n'
-            << encoder(vikk) << '\n';
+  std::stringstream file_contents {};
+  file_contents << file.rdbuf();
+  bencode::BDecoder decoder {};
 
-  std::cout << encoder(decoder(encoder(check))) << '\n'
-  << encoder(decoder(encoder(value))) << '\n'
-  << encoder(decoder(encoder(dict))) << '\n'
-  << encoder(decoder(encoder(vikk))) << '\n';
+  auto bencoded_torrent = decoder(file_contents.str());
 
+  auto torrent = btr::load_torrent_file(bencoded_torrent);
+
+  if (torrent.has_value()) {
+    btr::Torrenter torrenter {*torrent};
+
+    try {
+      torrenter.download_file(download_path, m_piece_vault);
+    } catch (std::exception& e) {
+      std::cout << e.what() << std::endl;
+    }
+
+  } else {
+    fmt::print("couldn't decode");
+  }
 }

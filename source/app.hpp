@@ -1,10 +1,17 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 
-struct App
+#include "client/storage/storage.hpp"
+
+class App
 {
-  std::string name;
-  App();
-  void Run();
+  std::shared_ptr<IStorage> m_piece_vault;
+
+public:
+  App(std::filesystem::path piece_vault_root);
+
+  void run(const std::string& torrent_file_path,
+           const std::string& download_path);
 };
