@@ -2,9 +2,13 @@
 Downloading torrents with Boost::Asio C++20 coroutines
 
 Status:
+
     * The code works
+    
     * The implemented download strategy is pretty dumb
+    
     * There's no graceful shutdown of coroutines
+    
 
 -----> No further work is planned currently.
 
