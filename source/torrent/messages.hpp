@@ -24,7 +24,7 @@ namespace btr
 
 #pragma pack(push, 1)
 
-constexpr uint8_t ID_KEEPALIVE = -1;
+constexpr uint8_t ID_KEEPALIVE = 255;
 constexpr uint8_t ID_CHOKE = 0;
 constexpr uint8_t ID_UNCHOKE = 1;
 constexpr uint8_t ID_INTERESTED = 2;
@@ -52,9 +52,7 @@ struct PACKED_ATTRIBUTE Handshake
   Handshake(const InternalContext& context)
   {
     auto id = context.id();
-    std::copy(id.as_raw().cbegin(),
-              id.as_raw().cend(),
-              peer_id);
+    std::copy(id.as_raw().cbegin(), id.as_raw().cend(), peer_id);
 
     std::copy(context.info_hash.cbegin(), context.info_hash.cend(), infohash);
   }
@@ -93,8 +91,13 @@ public:
 
 struct PACKED_ATTRIBUTE Request
 {
-  Request() {  }
-  Request(uint32_t piece_index, uint32_t offset, uint32_t length) {  }
+  Request() = default;
+  Request(uint32_t piece_index, uint32_t offset_within_piece, uint32_t length)
+      : piece_index {piece_index}
+      , offset_within_piece {offset_within_piece}
+      , length {length}
+  {
+  }
 
 private:
   MessageMetadata<13, ID_REQUEST> metadata;
@@ -134,8 +137,7 @@ using NotInterested = MessageMetadata<1, ID_NOT_INTERESTED>;
 
 struct PACKED_ATTRIBUTE PieceMetadata
 {
-public:
-  void add_length(int32_t some_length) { metadata.add_length(some_length); }
+  void add_length(uint32_t some_length) { metadata.add_length(some_length); }
 
 private:
   MessageMetadata<9, ID_PIECE> metadata;
@@ -146,7 +148,7 @@ public:
 };
 
 template<typename T>
-concept SupportsDynamicLength = requires(T metadata, int32_t some_length) {
+concept SupportsDynamicLength = requires(T metadata, uint32_t some_length) {
   metadata.add_length(some_length);
 };
 

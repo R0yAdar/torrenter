@@ -14,8 +14,6 @@
 #include "torrent/metadata/torrentfile.hpp"
 #include "client/torrenter.hpp"
 
-using namespace boost;
-
 App::App(std::filesystem::path piece_vault_root)
     : m_piece_vault {std::make_shared<FileDirectoryStorage>(std::move(piece_vault_root))}
 {
@@ -38,7 +36,7 @@ App::App(std::filesystem::path piece_vault_root)
              OPENSSL_VERSION_STR);
 }
 
-void App::Run(const std::string& torrent_file_path,
+void App::run(const std::string& torrent_file_path,
               const std::string& download_path)
 {
   fmt::print(fg(fmt::color::antique_white) | fmt::emphasis::bold

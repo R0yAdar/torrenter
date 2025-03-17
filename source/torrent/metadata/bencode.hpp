@@ -32,7 +32,7 @@ class BEncoder : public boost::static_visitor<std::string>
 public:
   std::string operator()(BeValue value) const;
   std::string operator()(std::int64_t value) const;
-  std::string operator()(std::string value) const;
+  std::string operator()(const std::string& value) const;
   std::string operator()(const List& values) const;
   std::string operator()(const Dict& values) const;
 };

@@ -12,6 +12,6 @@ class App
 public:
   App(std::filesystem::path piece_vault_root);
 
-  void Run(const std::string& torrent_file_path,
+  void run(const std::string& torrent_file_path,
            const std::string& download_path);
 };

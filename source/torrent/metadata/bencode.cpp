@@ -27,7 +27,7 @@ std::string BEncoder::operator()(std::int64_t value) const
   return INT_PREFIX + std::to_string(value) + SUFFIX;
 }
 
-std::string BEncoder::operator()(std::string value) const
+std::string BEncoder::operator()(const std::string& value) const
 {
   return std::to_string(value.length()) + STRING_LENGTH_DELIMITER + value;
 }
@@ -62,61 +62,61 @@ std::string BEncoder::operator()(const Dict& values) const
 
 DecodeResult BDecoder::decode_int(std::string_view value) const
 {
-  auto endIndex = value.find_first_of(SUFFIX);
-  if (endIndex == std::string::npos) {
+  auto end_index = value.find_first_of(SUFFIX);
+  if (end_index == std::string::npos) {
     throw std::invalid_argument("Corrupted int encoding: no suffix");
   }
 
-  std::int64_t intValue;
+  std::int64_t int_value;
   auto result =
-      std::from_chars(value.data() + 1, value.data() + endIndex, intValue);
+      std::from_chars(value.data() + 1, value.data() + end_index, int_value);
 
   if (result.ec == std::errc::invalid_argument
       || result.ec == std::errc::result_out_of_range)
   {
     throw std::invalid_argument(std::format(
-        "Corrupted string encoding: couldn't decode string length, errc: {}",
-        static_cast<int>(result.ec)));
+        "Corrupted string encoding: couldn't decode string length, error-code: {}",
+        std::to_string(static_cast<int>(result.ec))));
   }
 
-  if (result.ptr != value.data() + endIndex) {
+  if (result.ptr != value.data() + end_index) {
     throw std::invalid_argument("Corrupted string encoding: string length");
   }
 
-  return {intValue, ++endIndex};
+  return {.result=int_value, .used_chars=++end_index};
 }
 
 DecodeResult BDecoder::decode_string(std::string_view value) const
 {
-  auto delimitIndex = value.find_first_of(STRING_LENGTH_DELIMITER);
+  auto index_of_delimiter = value.find_first_of(STRING_LENGTH_DELIMITER);
 
-  if (delimitIndex == std::string::npos) {
+  if (index_of_delimiter == std::string::npos) {
     throw std::invalid_argument("Corrupted string encoding: no delimiter");
   }
 
   size_t length;
   auto result =
-      std::from_chars(value.data(), value.data() + delimitIndex, length);
+      std::from_chars(value.data(), value.data() + index_of_delimiter, length);
 
   if (result.ec == std::errc::invalid_argument
       || result.ec == std::errc::result_out_of_range)
   {
     throw std::invalid_argument(
-        "Corrupted string encoding: couldn't decode string length, errc: "
-        + (char)result.ec);
+        "Corrupted string encoding: couldn't decode string length, error-code: "
+        + std::to_string(static_cast<int>(result.ec)));
   }
 
-  if (result.ptr != value.data() + delimitIndex) {
+  if (result.ptr != value.data() + index_of_delimiter) {
     throw std::invalid_argument("Corrupted string encoding: string length");
   }
 
-  if (length + (++delimitIndex) > value.length()) {
+  if (length + (++index_of_delimiter) > value.length()) {
     throw std::invalid_argument(
         "Corrupted string encoding: length doesn't match string");
   }
 
-  return {std::string(value.data() + delimitIndex, length),
-          delimitIndex + length};
+  return {.result=std::string(value.data() + index_of_delimiter, length),
+    .used_chars=index_of_delimiter + length};
 }
 
 DecodeResult BDecoder::decode_dict(std::string_view value, int maxDepth) const
@@ -139,7 +139,7 @@ DecodeResult BDecoder::decode_dict(std::string_view value, int maxDepth) const
     index += valUsedChars;
   }
 
-  return {values, ++index};
+  return {.result=values, .used_chars=++index};
 }
 
 DecodeResult BDecoder::decode_list(std::string_view value, int maxDepth) const
@@ -156,7 +156,7 @@ DecodeResult BDecoder::decode_list(std::string_view value, int maxDepth) const
     index += usedChars;
   }
 
-  return {values, ++index};
+  return {.result=values, .used_chars=++index};
 }
 
 DecodeResult BDecoder::decode(std::string_view value, int maxDepth) const
@@ -166,7 +166,7 @@ DecodeResult BDecoder::decode(std::string_view value, int maxDepth) const
   }
 
   if (value.length() < MINIMUM_BEVALUE_ENCODED_SIZE) {
-    throw std::invalid_argument("Input length must be greater than minium");
+    throw std::invalid_argument("Input length must be greater than minimum");
   }
 
   switch (value.front()) {

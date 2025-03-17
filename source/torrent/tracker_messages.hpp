@@ -2,12 +2,7 @@
 
 #include <algorithm>
 #include <array>
-#include <climits>
-#include <cstddef>
-#include <functional>
-#include <random>
 #include <string>
-#include <string_view>
 
 #include "auxiliary/big_endian.hpp"
 #include "auxiliary/random.hpp"
@@ -37,11 +32,11 @@ enum class Actions : int32_t
   Error = 3,  // Only sent by tracker to client
 };
 
-const uint64_t MAGIC = 0x41727101980;
+constexpr uint64_t ANNOUNCER_MAGIC = 0x41727101980;
 
 struct PACKED_ATTRIBUTE ConnectRequest
 {
-  uint64_big protocol_id = MAGIC;
+  uint64_big protocol_id = ANNOUNCER_MAGIC;
   uint32_big action = static_cast<uint32_t>(Actions::Connect);
   uint32_big transaction_id =
       generate_random_in_range<uint32_t, 0, UINT32_MAX>();

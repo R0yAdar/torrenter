@@ -1,7 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <cstddef>
 #include <string>
 #include <vector>
 #include <array>
@@ -47,11 +46,11 @@ struct TorrentFile
   std::vector<std::string> trackers;
   std::vector<std::vector<uint8_t>> piece_hashes;
 
-  int64_t file_length;
-  int64_t piece_length;
+  uint64_t file_length;
+  uint32_t piece_length;
 };
 
-enum class TorrentFileParseError
+enum class TorrentFileParseError : uint8_t
 {
     MissingField,
     InvalidField,

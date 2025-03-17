@@ -1,9 +1,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
-#include <print>
 #include <regex>
-#include <set>
 
 #include "client/torrenter.hpp"
 
@@ -20,7 +18,7 @@ Torrenter::Torrenter(TorrentFile torrent)
 {
 }
 
-void Torrenter::download_file(std::filesystem::path at, std::shared_ptr<IStorage> storage_device)
+void Torrenter::download_file(std::filesystem::path at, std::shared_ptr<IStorage> storage_device) const
 {
   std::regex rgx(R"(udp://([a-zA-Z0-9.-]+):([0-9]+)/announce)");
 
@@ -40,10 +38,10 @@ void Torrenter::download_file(std::filesystem::path at, std::shared_ptr<IStorage
               -> boost::asio::awaitable<void>
           {
             boost::asio::ip::udp::resolver resolver(resolve_io);
-            boost::asio::ip::udp::resolver::query query(
+            boost::asio::ip::udp::resolver::query dns_query(
                 boost::asio::ip::udp::v4(), address, std::to_string(port));
             boost::asio::ip::udp::endpoint endpoint =
-                *(co_await resolver.async_resolve(query));
+                *(co_await resolver.async_resolve(dns_query));
             endpoints.push_back(endpoint);
           },
           boost::asio::detached);
@@ -64,7 +62,7 @@ void Torrenter::download_file(std::filesystem::path at, std::shared_ptr<IStorage
   context->piece_hashes = m_torrent.piece_hashes;
   context->file_size = m_torrent.file_length;
   context->piece_size = m_torrent.piece_length;
-  context->piece_count = m_torrent.piece_hashes.size();
+  context->piece_count = static_cast<uint32_t>(m_torrent.piece_hashes.size());
 
   std::cout << "FileSize: " << context->file_size << std::endl;
 

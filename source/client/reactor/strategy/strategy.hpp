@@ -1,8 +1,8 @@
 #pragma once
 
 #include <algorithm>
-#include <iostream>
 #include <map>
+#include <ranges>
 #include <set>
 
 #include "client/downloader/downloader.hpp"
@@ -36,8 +36,8 @@ class RandomPieceStrategy : public IStrategy
   std::set<PeerContactInfo> m_active_connections;
   std::set<uint32_t> m_missing_pieces;
 
-  std::shared_ptr<IStorage> m_storage_device;
   std::shared_ptr<InternalContext> m_app_context;
+  std::shared_ptr<IStorage> m_storage_device;
 
 public:
   RandomPieceStrategy(std::shared_ptr<InternalContext> app_context,
@@ -45,7 +45,7 @@ public:
       : m_app_context {std::move(app_context)}
       , m_storage_device {std::move(storage_device)}
   {
-    for (size_t i = 0; i < m_app_context->piece_count; i++) {
+    for (uint32_t i = 0; i < m_app_context->piece_count; i++) {
       if (!m_storage_device->exists(m_app_context->info_hash_as_string(), i)) {
         m_missing_pieces.insert(i);
       }
@@ -72,15 +72,22 @@ public:
 
   boost::asio::awaitable<void> assign() override final
   {
-    /// RANK PIECES
-    /// RANK PEER FOR EACH PIECE
-    ///
-    ///
+    std::vector missing_pieces(m_missing_pieces.cbegin(),
+                                         m_missing_pieces.cend());
+    static std::random_device rd;
+    static std::mt19937 rand_generator(rd());
+
+    std::ranges::shuffle(missing_pieces.begin(), missing_pieces.end(), rand_generator);
 
     for (size_t i = 0; i < 2; i++) {
-      for (auto piece_index : m_missing_pieces) {
-        if (m_piece_downloaders[piece_index].size() < 8) {
+      for (auto piece_index : missing_pieces) {
+        if (m_piece_downloaders[piece_index].size() < 2) {
           for (auto& [downloader, assigned_pieces] : m_peer_pool) {
+            if (std::ranges::contains(m_piece_downloaders[piece_index],
+                                      downloader))
+            {
+              continue;
+            }
             if (downloader->get_context().status.remote_bitfield.get(
                     piece_index)
                 && assigned_pieces.size() < 2)
@@ -129,7 +136,7 @@ public:
     std::vector<uint32_t> completed_indexes {};
 
     for (auto& [index, downloaders] : m_piece_downloaders) {
-      for (auto& downloader : downloaders) {
+      for (auto downloader : downloaders) {
         if (auto piece = co_await downloader->retrieve_piece(index)) {
           switch (piece->status) {
             case PieceStatus::Complete:
@@ -146,7 +153,6 @@ public:
               break;
 
             case PieceStatus::Corrupt:
-              std::cout << "Redownloading corrupt\n";
               co_await downloader->download_piece(index);
               break;
 
@@ -161,7 +167,7 @@ public:
       m_piece_downloaders.erase(index);
     }
 
-    co_return m_missing_pieces.size() == 0;
+    co_return m_missing_pieces.empty();
   }
 };
 }  // namespace btr

@@ -26,7 +26,7 @@ public:
 
   boost::asio::awaitable<void> fetch_udp_swarm(
       boost::asio::any_io_executor& io,
-      std::vector<udp::endpoint>& endpoints,
+      std::weak_ptr<std::vector<udp::endpoint>> out_peer_endpoints,
       std::chrono::seconds timeout = 1s) const;
 };
 }  // namespace btr

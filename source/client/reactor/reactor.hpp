@@ -32,16 +32,18 @@ public:
   }
 
   boost::asio::awaitable<void> download(std::string filepath,
-                                        std::vector<Tracker>& trackers)
+                                        std::vector<Tracker>& trackers) const
   {
     auto io = co_await boost::asio::this_coro::executor;
+
+    auto shared_io = std::make_shared<decltype(io)>(io);
 
     boost::asio::co_spawn(
         io,
         [&]() -> boost::asio::awaitable<void>
         {
           while (!co_await m_strategy->is_done()) {
-            std::vector<udp::endpoint> swarm;
+            auto swarm = std::make_shared<std::vector<udp::endpoint>>();
 
             for (auto& tracker : trackers) {
               boost::asio::co_spawn(io,
@@ -56,7 +58,7 @@ public:
 
             std::vector<PeerContactInfo> peers;
 
-            for (auto& ep : swarm) {
+            for (auto& ep : *swarm) {
               peers.emplace_back(ep.address(), ep.port());
             }
 
@@ -88,19 +90,15 @@ public:
         co_await m_strategy->revoke();
         co_await m_strategy->assign();
 
-        if (co_await m_strategy->is_done())
+        if (co_await m_strategy->is_done()) {
+          std::cout << "I'm done!\n";
           break;
+        }
       }
 
       auto info_hash = m_context->info_hash_as_string();
 
-      if (std::filesystem::exists(filepath)) {
-        std::cout << "DOWNLOADED\n";
-
-        co_return;
-      }
-
-      boost::asio::stream_file ofile {
+      boost::asio::stream_file output_file {
           co_await boost::asio::this_coro::executor,
           filepath,
           boost::asio::stream_file::flags::write_only
@@ -109,24 +107,21 @@ public:
       uint32_t index = 0;
 
       std::vector<uint8_t> buffer(m_context->get_piece_size(0));
-
-      std::cout << "MErging!!!!!!\n";
-
+      std::cout << "Finished downloading -> merging pieces\n";
       while (m_storage_device->exists(info_hash, index)) {
         auto piece_size = m_context->get_piece_size(index);
-        std::cout << "Merging " << index << std::endl;
 
         co_await m_storage_device->pull_piece(
             info_hash, index, 0, piece_size, buffer);
 
         co_await boost::asio::async_write(
-            ofile,
+            output_file,
             boost::asio::buffer(buffer, piece_size),
             boost::asio::use_awaitable);
         ++index;
       }
     } catch (std::exception& ex) {
-      std::cout << ex.what() << std::endl;
+      std::cerr << ex.what() << '\n';
     }
   }
 };

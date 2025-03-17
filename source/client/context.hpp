@@ -59,7 +59,7 @@ public:
       return piece_size;
     }
 
-    return file_size - rounded_max_index * piece_size;
+    return static_cast<uint32_t>(file_size - rounded_max_index * piece_size);
   }
 };
 

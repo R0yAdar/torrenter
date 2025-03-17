@@ -1,5 +1,5 @@
-#include <ranges>
 #include <expected>
+#include <ranges>
 #include <vector>
 
 #include "client/tracker/tracker.hpp"
@@ -123,7 +123,7 @@ Tracker::Tracker(std::shared_ptr<InternalContext> context,
 
 boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
     boost::asio::any_io_executor& io,
-    std::vector<udp::endpoint>& out_peer_endpoints,
+    std::weak_ptr<std::vector<udp::endpoint>> out_peer_endpoints,
     std::chrono::seconds timeout) const
 {
   auto deadline = std::chrono::steady_clock::now() + timeout;
@@ -173,8 +173,10 @@ boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
     co_return;
   }
 
-  for (const auto& ip : parse_ipv4_peer_endpoints(*response, buffer.size())) {
-    out_peer_endpoints.emplace_back(ip);
+  if (auto out_endpoints = out_peer_endpoints.lock()) {
+    for (const auto& ip : parse_ipv4_peer_endpoints(*response, buffer.size())) {
+      out_endpoints->emplace_back(ip);
+    }
   }
 
   socket.close();

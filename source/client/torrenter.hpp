@@ -16,7 +16,7 @@ public:
   Torrenter(TorrentFile torrent);
 
   void download_file(std::filesystem::path at,
-                     std::shared_ptr<IStorage> storage_device);
+                     std::shared_ptr<IStorage> storage_device) const;
 };
 
 }  // namespace btr
