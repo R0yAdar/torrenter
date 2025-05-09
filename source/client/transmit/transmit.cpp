@@ -1,5 +1,4 @@
 #include <expected>
-#include <iostream>
 #include <utility>
 
 #include "client/transmit/transmit.hpp"
@@ -126,8 +125,10 @@ std::expected<TorrentMessage, ParseError> parse_message(
       return reinterpret_safely<Have>(data).transform(
           [](auto* value) { return Have {*value}; });
     case ID_BITFIELD:
-        // TODO, add get_metadata to all
-      return BitField {std::vector(data.cbegin() + 4  + 1, data.cend())};
+      return BitField {std::vector(
+          data.cbegin()
+              + sizeof(decltype(std::declval<BitField>().get_metadata())),
+          data.cend())};
     case ID_REQUEST:
       return reinterpret_safely<Request>(data).transform(
           [](auto* value) { return Request {*value}; });
@@ -175,7 +176,10 @@ awaitable<std::expected<TorrentMessage, ParseError>> read_message(
   *reinterpret_cast<int32_t*>(buffer.data()) = message_length;
 
   co_await boost::asio::async_read(
-      socket, boost::asio::buffer(buffer.data() + sizeof(message_length), message_length), boost::asio::use_awaitable);
+      socket,
+      boost::asio::buffer(buffer.data() + sizeof(message_length),
+                          message_length),
+      boost::asio::use_awaitable);
 
   co_return parse_message(buffer[sizeof(message_length)], buffer);
 }

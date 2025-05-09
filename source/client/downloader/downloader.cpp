@@ -4,6 +4,7 @@
 
 #include <openssl/sha.h>
 
+#include "auxiliary/log.hpp"
 #include "auxiliary/variant_aux.hpp"
 
 namespace btr
@@ -17,6 +18,7 @@ Downloader::Downloader(std::shared_ptr<const InternalContext> context,
     , m_callback {std::make_shared<message_callback>(
           [this](TorrentMessage m) -> boost::asio::awaitable<void>
           { co_await triggered_on_received_message(m); })}
+    , m_is_choked {false}
 {
   m_peer->add_callback({m_callback});
 }
@@ -29,6 +31,11 @@ const ExternalPeerContext& Downloader::get_context() const
 const PeerActivity& Downloader::get_activity() const
 {
   return m_peer->get_activity();
+}
+
+const bool Downloader::is_choked() const
+{
+  return m_is_choked;
 }
 
 boost::asio::awaitable<bool> Downloader::download_piece(uint32_t index)
@@ -103,12 +110,20 @@ boost::asio::awaitable<void> Downloader::triggered_on_received_message(
   std::visit(
       overloaded {
           [](auto&) {},
-          [&should_try_sending_messages](Unchoke)
-          { should_try_sending_messages = true; },
-          [&should_try_sending_messages, &should_choke_active_requests](Choke)
+          [&should_try_sending_messages, this](Unchoke)
           {
+            should_try_sending_messages = true;
+            m_is_choked = false;
+          },
+          [&should_try_sending_messages, &should_choke_active_requests, this](
+              Choke)
+          {
+            Log::Warn("Choked By: ({}, {})",
+                      m_peer->get_context().contact_info.address.to_string(),
+                      m_peer->get_context().contact_info.port);
             should_choke_active_requests = true;
             should_try_sending_messages = true;
+            m_is_choked = true;
           },
           [&should_try_sending_messages, &should_handle_piece](Piece)
           {

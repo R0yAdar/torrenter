@@ -13,8 +13,8 @@ namespace btr
 
 struct DownloaderPolicy
 {
-  uint32_t max_block_bytes = 8 * 1024;
-  uint16_t max_concurrent_outgoing_requests = 7;
+  uint32_t max_block_bytes = 16 * 1024;
+  uint16_t max_concurrent_outgoing_requests = 50;
 };
 
 struct RequestIdentifier
@@ -35,6 +35,7 @@ class Downloader
   std::deque<Request> m_pending_requests;
   std::set<RequestIdentifier> m_active_requests;
   std::shared_ptr<message_callback> m_callback;
+  bool m_is_choked;
 
 public:
   Downloader(std::shared_ptr<const InternalContext> context,
@@ -44,6 +45,8 @@ public:
   const ExternalPeerContext& get_context() const;
 
   const PeerActivity& get_activity() const;
+
+  const bool is_choked() const;
 
   boost::asio::awaitable<bool> download_piece(uint32_t index);
 
