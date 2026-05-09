@@ -73,6 +73,7 @@ std::expected<std::vector<std::string>, TorrentFileParseError> parse_announcers(
   return std::unexpected {TorrentFileParseError::InvalidField};
 }
 }  // namespace
+
 std::expected<TorrentFile, TorrentFileParseError> load_torrent_file(
     BeValue file)
 {

@@ -1,6 +1,5 @@
 #include <cstdlib>
 #include <fstream>
-#include <iostream>
 #include <regex>
 
 #include "app.hpp"
@@ -59,10 +58,10 @@ void App::run(const std::string& torrent_file_path,
     try {
       torrenter.download_file(download_path, m_piece_vault);
     } catch (std::exception& e) {
-      std::cout << e.what() << std::endl;
+      fmt::print("Couldn't download due to: {}",  e.what());
     }
 
   } else {
-    fmt::print("couldn't decode");
+    fmt::print("Couldn't decode torrent file: {}\n", (int)torrent.error());
   }
 }

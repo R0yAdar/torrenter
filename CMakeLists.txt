@@ -25,8 +25,8 @@ add_library(
     "source/torrent/bitfield/bitfield.hpp"
     "source/torrent/bitfield/bitfield.cpp"
     "source/torrent/messages.hpp" 
-    "source/client/reactor/reactor.hpp"
-    "source/client/reactor/reactor.cpp"
+    "source/client/manager/composer.hpp"
+    "source/client/manager/composer.cpp"
     
     "source/client/storage/storage.cpp"
     "source/client/storage/storage.hpp"
@@ -40,8 +40,8 @@ add_library(
     "source/client/tracker/tracker.cpp"
     "source/client/peer.hpp"
     "source/client/peer.cpp"
-    "source/client/reactor/strategy/strategy.hpp"
-    "source/client/reactor/strategy/strategy.cpp"
+    "source/client/manager/strategy/strategy.hpp"
+    "source/client/manager/strategy/strategy.cpp"
     "source/client/context.hpp"
     "source/auxiliary/peer_id.hpp"
      

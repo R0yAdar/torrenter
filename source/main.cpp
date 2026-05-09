@@ -16,7 +16,8 @@ auto main() -> int
     }
 
     std::string torrent_file_path;
-    std::cout << "Enter path to torrent-file:\n";
+    std::cout
+        << "Enter path to torrent-file (you can use https://itorrents.net/, https://nyaa.si/view/2090638, etc.):\n";
     std::getline(std::cin, torrent_file_path);
 
     if (!std::filesystem::exists(torrent_file_path)) {
@@ -24,15 +25,13 @@ auto main() -> int
       return -1;
     }
 
-    std::string download_path;
-    std::cout << "Enter path for the downloaded file:\n";
-    std::getline(std::cin, download_path);
+    std::string download_path = torrent_file_path + ".download";
 
-    auto app = App {std::filesystem::path {"C:\\torrents"}};
+    auto app = App {std::filesystem::path {torrent_vault_path}};
 
     app.run(torrent_file_path, download_path);
 
-    std::cout << "Finished download.\n";
+    std::cout << "Finished downloading.\n";
   } catch (std::invalid_argument& ex) {
     std::cerr << "Error: " << ex.what() << std::endl;
     return -1;

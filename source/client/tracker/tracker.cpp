@@ -8,6 +8,7 @@
 #include <boost/asio/experimental/awaitable_operators.hpp>
 
 #include "torrent/tracker_messages.hpp"
+#include "auxiliary/log.hpp"
 
 using boost::asio::ip::address;
 using boost::asio::ip::port_type;
@@ -136,13 +137,10 @@ boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
   std::vector<uint8_t> buffer {};
   buffer.resize(UINT16_MAX);
 
-  {
-    ConnectRequest request {};
+  ConnectRequest request {};
 
-    co_await socket.async_send_to(
-        boost::asio::buffer(&request, sizeof(request)), remote_endpoint);
-  }
-
+  co_await socket.async_send_to(boost::asio::buffer(&request, sizeof(request)),
+                                remote_endpoint);
   udp::endpoint sender {};
 
   auto handshake_response =
@@ -172,10 +170,10 @@ boost::asio::awaitable<void> Tracker::fetch_udp_swarm(
   if (!response || sender != remote_endpoint) {
     co_return;
   }
-
+  
   if (auto out_endpoints = out_peer_endpoints.lock()) {
-    for (const auto& ip : parse_ipv4_peer_endpoints(*response, buffer.size())) {
-      out_endpoints->emplace_back(ip);
+    for (const auto& ep : parse_ipv4_peer_endpoints(*response, buffer.size())) {
+      out_endpoints->emplace_back(ep);
     }
   }
 

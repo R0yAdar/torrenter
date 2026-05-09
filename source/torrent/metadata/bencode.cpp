@@ -3,7 +3,6 @@
 #include <format>
 #include <sstream>
 #include <system_error>
-#include <iostream>
 
 #include "bencode.hpp"
 
